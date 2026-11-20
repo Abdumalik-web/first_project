@@ -191,7 +191,14 @@ bash /opt/taxi-bot/deploy/setup.sh
 
 Foydali buyruqlar: `journalctl -u taxi-bot -f` (loglar), `systemctl restart taxi-bot`, `systemctl stop taxi-bot`.
 
-**Yangilash:** arxivni `.env` va bazasiz yarating, yuboring va yana `setup.sh` ni ishga tushiring:
+**Yangilash (eng oson):** serverga kirib (`ssh root@SERVER_IP`) bitta buyruq yozing —
+server GitHub'dan eng yangi versiyani o'zi yuklab oladi, `.env` va baza o'zgarmaydi:
+
+```bash
+bash /opt/taxi-bot/deploy/update.sh
+```
+
+**Yangilash (kompyuterdan):** arxivni `.env` va bazasiz yarating, yuboring va yana `setup.sh` ni ishga tushiring:
 
 ```powershell
 tar -czf bot.tgz --exclude=.venv --exclude=.git --exclude=__pycache__ --exclude=.env --exclude=*.db first_project
