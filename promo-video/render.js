@@ -8,6 +8,8 @@ const FPS = 30, DUR = 15;
   const mode = process.argv[2] || 'preview';
   const browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width: 1080, height: 1920 }, deviceScaleFactor: 1 });
+  const fs = require('fs'); const sj = path.join(__dirname, 'build/subs.json');
+  if (fs.existsSync(sj)) await page.addInitScript(s => { window.SUBS_OVERRIDE = s; }, JSON.parse(fs.readFileSync(sj, 'utf8')));
   await page.goto('file://' + path.join(__dirname, 'scene.html'));
   await page.evaluate(() => document.fonts.ready);
   if (mode === 'preview') {
