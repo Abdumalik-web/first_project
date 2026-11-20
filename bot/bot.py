@@ -140,7 +140,11 @@ async def moderate(msg: Message, bot: Bot) -> None:
 async def main() -> None:
     token = BOT_TOKEN
     if not token:
+        import sys
         from getpass import getpass
+
+        if not sys.stdin.isatty():
+            raise SystemExit("BOT_TOKEN o'rnatilmagan (serverda uni muhit o'zgaruvchisi qilib bering).")
 
         # Token ekranda ko'rinmaydi (skrinshotda chiqib qolmasligi uchun)
         token = getpass("Bot tokenini kiriting (yozganingiz ko'rinmaydi) va Enter bosing: ")
