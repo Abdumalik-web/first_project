@@ -25,7 +25,9 @@ from .. import texts
 from ..config import Config
 from ..db import Database
 from ..keyboards import main_menu
-from ..regions import DIRECTIONS, fergana_name, fmt_date, slot_name
+from ..group_parser import parse as parse_group
+from ..matching import rank_trips_for_lead
+from ..regions import DIRECTIONS, date_options, fergana_name, fmt_date, slot_name, today
 from ..service import MatchService
 
 router = Router(name="admin")
@@ -68,7 +70,8 @@ ADMIN_HELP = (
     "/ban <i>id</i> — bloklash (faol e'lon va so'rovlari bekor qilinadi)\n"
     "/unban <i>id</i> — blokdan chiqarish\n"
     "/del_trip <i>raqam</i> — e'lonni o'chirish\n"
-    "/del_req <i>raqam</i> — so'rovni o'chirish"
+    "/del_req <i>raqam</i> — so'rovni o'chirish\n"
+    "/tekshir <i>matn</i> — guruh xabarini bot qanday tushunishini ko'rish"
 )
 
 
@@ -168,6 +171,51 @@ async def ban_help(cb: CallbackQuery) -> None:
         "ID raqamlarni «Faol e'lonlar» va «Kutayotgan so'rovlar» ro'yxatida ham ko'rasiz."
     )
     await cb.answer()
+
+
+@router.message(Command("tekshir"))
+async def check_text(message: Message, command: CommandObject, db: Database) -> None:
+    """Guruh xabarini bot qanday tushunishini va kimga yuborilishini ko'rsatadi."""
+    if not command.args:
+        await message.answer(
+            "Masalan:\n<code>/tekshir Ertaga Qo'qondan Toshkentga 2 kishi kerak 90 123 45 67</code>"
+        )
+        return
+    lead = parse_group(command.args)
+    if lead is None:
+        await message.answer(
+            "❌ Bot bu xabarni <b>yo'lovchi e'loni deb tanimadi</b>.\n\n"
+            "Xabarda Farg'ona tumani, Toshkent va «kerak», «kishi» kabi so'z bo'lishi kerak. "
+            "«joy bor», «ketyapmiz», mashina nomi kabi so'zlar bo'lsa — haydovchi e'loni deb hisoblanadi."
+        )
+        return
+    base = today()
+    trip_date = lead.trip_date(base)
+    dates = [trip_date] if trip_date else [iso for iso, _ in date_options(base)[:2]]
+    trips = {t["id"]: t for t in await db.active_trips_on(lead.direction, dates)}
+    matches = rank_trips_for_lead(lead.direction, lead.fergana_code, lead.tashkent_code,
+                                  lead.slot, lead.seats, trips.values())
+    lines = [
+        "✅ <b>Yo'lovchi e'loni deb tanildi</b>",
+        f"Yo'nalish: {DIRECTIONS[lead.direction]}",
+        f"Tuman: {fergana_name(lead.fergana_code)}",
+        f"Sana: {fmt_date(trip_date) if trip_date else 'aytilmagan (bugun va ertaga qidiriladi)'}",
+        f"Vaqt: {slot_name(lead.slot) if lead.slot else 'aytilmagan'}",
+        f"Kishi: {lead.seats or 'aytilmagan'}",
+        "Telefon: " + (", ".join(lead.phones) or "yo'q"),
+        "",
+        f"Shu yo'nalish va sanada faol e'lonlar: {len(trips)}",
+        f"Ulardan mos keladiganlar: <b>{len(matches)}</b>",
+    ]
+    for m in matches[:5]:
+        t = trips[m.trip_id]
+        lines.append(f"• E'lon #{t['id']} (haydovchi id {t['driver_id']}), {m.distance_km:g} km")
+    if not matches:
+        lines.append(
+            "\nMos haydovchi yo'q. Haydovchining e'lonida shu tuman tanlanganmi, sanasi "
+            "va vaqti to'g'ri keladimi — tekshiring."
+        )
+    await message.answer("\n".join(lines))
 
 
 # --- foydalanuvchilar ---------------------------------------------------------

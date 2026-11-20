@@ -85,7 +85,9 @@ async def on_group_message(message: Message, db: Database, bot: Bot) -> None:
         return
     raw = message.text or message.caption or ""
     lead = parse(raw)
+    short = raw.replace("\n", " ")[:60]
     if lead is None:
+        log.info("Guruh «%s»: xabar keldi, yo'lovchi e'loni emas: %s", message.chat.title, short)
         return
 
     await db.upsert_group(message.chat.id, message.chat.title, message.chat.username, True)
@@ -94,6 +96,7 @@ async def on_group_message(message: Message, db: Database, bot: Bot) -> None:
     since = (datetime.now(timezone.utc) - timedelta(hours=DUPLICATE_WINDOW_H)).isoformat(timespec="seconds")
     # Bir xil e'lon bir nechta guruhga tashlansa — haydovchiga bir marta boradi
     if await db.is_duplicate_lead(user_id, text_hash, since):
+        log.info("Guruh «%s»: takroriy e'lon, o'tkazib yuborildi: %s", message.chat.title, short)
         return
 
     base = today()

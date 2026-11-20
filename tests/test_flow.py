@@ -167,6 +167,11 @@ async def test_admin_panel(app):
     await send(bot, dp, ADMIN, f"/unban {U2}")
     assert not await db.is_banned(U2)
 
+    await send(bot, dp, ADMIN, "/tekshir Ertaga Qo'qondan Toshkentga 2 kishi kerak")
+    assert "tanildi" in bot.texts_to(ADMIN)[-1]
+    await send(bot, dp, ADMIN, "/tekshir Toshkentga ketyapmiz joy bor")
+    assert "tanimadi" in bot.texts_to(ADMIN)[-1]
+
     await send(bot, dp, U1, "/id")
     assert str(U1) in bot.texts_to(U1)[-1]
 
