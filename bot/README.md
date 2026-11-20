@@ -32,8 +32,8 @@ Har bir guruh sozlamasi alohida `settings.json` faylida saqlanadi.
 bosmaguncha guruhga yoza olmaydi: xabari o'chiriladi va start tugmasi ko'rsatiladi.
 Bot buni o'sha bot nomidan foydalanuvchiga "yozmoqda..." holatini yuborib tekshiradi
 (faqat start bosganlarga yuborish mumkin). Tasdiq 24 soat eslab qolinadi.
-"Start bosing" xabari 1 daqiqadan keyin (`START_WARN_TTL`) yoki a'zo start bosib
-yozishi bilan darhol o'chadi.
+"Start bosing" xabari a'zo start bosishi bilan (har 3 soniyada tekshiriladi) yoki
+1 daqiqadan keyin (`START_WARN_TTL`) o'chadi.
 
 ## Sozlamalar (muhit o'zgaruvchilari)
 | O'zgaruvchi | Ma'nosi |

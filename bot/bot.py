@@ -181,11 +181,15 @@ async def _delete_later(msg: Message, delay: int, key: tuple[int, int] | None = 
     await _safe_delete(msg)
 
 
-def schedule_delete(msg: Message, delay: int, key: tuple[int, int] | None = None) -> None:
+def _track(coro) -> None:
     # Vazifaga havola saqlanadi, aks holda Python uni vaqtidan oldin yo'q qilishi mumkin
-    task = asyncio.create_task(_delete_later(msg, delay, key))
+    task = asyncio.create_task(coro)
     _bg_tasks.add(task)
     task.add_done_callback(_bg_tasks.discard)
+
+
+def schedule_delete(msg: Message, delay: int, key: tuple[int, int] | None = None) -> None:
+    _track(_delete_later(msg, delay, key))
 
 
 @dp.message(Command("start"), F.chat.type == ChatType.PRIVATE)
@@ -350,6 +354,23 @@ async def _require_start(msg: Message, bot: Bot) -> None:
     )
     _start_warnings[key] = warn
     schedule_delete(warn, START_WARN_TTL, key)
+    _track(_watch_start(key, warn))
+
+
+START_CHECK_INTERVAL = float(os.getenv("START_CHECK_INTERVAL", "3"))  # soniya
+
+
+async def _watch_start(key: tuple[int, int], warn: Message) -> None:
+    """Ogohlantirish turganda a'zo start bosganini kuzatadi va bosishi bilan uni o'chiradi."""
+    while _start_warnings.get(key) is warn:
+        await asyncio.sleep(START_CHECK_INTERVAL)
+        if _start_warnings.get(key) is not warn:
+            return
+        if await has_started(key[1]):
+            if _start_warnings.get(key) is warn:
+                _start_warnings.pop(key, None)
+                await _safe_delete(warn)
+            return
 
 
 async def main() -> None:
