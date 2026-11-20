@@ -42,6 +42,8 @@ REQUIRE_START = os.getenv("REQUIRE_START", "1" if REQUIRED_BOT_TOKEN else "0") =
 USERS_FILE = os.getenv("USERS_FILE", os.path.join(os.path.dirname(os.path.abspath(__file__)), "users.json"))
 # Ogohlantirish xabari necha soniyadan keyin o'chsin
 WARN_TTL = int(os.getenv("WARN_TTL", "10"))
+# "Botga start bosing" xabari necha soniyadan keyin o'chsin
+START_WARN_TTL = int(os.getenv("START_WARN_TTL", "60"))
 
 BLOCKED_DOMAINS = (
     "t.me", "telegram.me", "telegram.dog",
@@ -158,12 +160,32 @@ async def is_admin(bot: Bot, chat_id: int, user_id: int) -> bool:
     return member.status in (ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.CREATOR)
 
 
-async def _delete_later(msg: Message, delay: int) -> None:
-    await asyncio.sleep(delay)
+_bg_tasks: set[asyncio.Task] = set()
+# (chat_id, user_id) -> hali o'chirilmagan "start bosing" xabari
+_start_warnings: dict[tuple[int, int], Message] = {}
+
+
+async def _safe_delete(msg: Message) -> None:
     try:
         await msg.delete()
     except TelegramBadRequest:
         pass
+
+
+async def _delete_later(msg: Message, delay: int, key: tuple[int, int] | None = None) -> None:
+    await asyncio.sleep(delay)
+    if key is not None:
+        if _start_warnings.get(key) is not msg:
+            return  # allaqachon o'chirilgan
+        _start_warnings.pop(key, None)
+    await _safe_delete(msg)
+
+
+def schedule_delete(msg: Message, delay: int, key: tuple[int, int] | None = None) -> None:
+    # Vazifaga havola saqlanadi, aks holda Python uni vaqtidan oldin yo'q qilishi mumkin
+    task = asyncio.create_task(_delete_later(msg, delay, key))
+    _bg_tasks.add(task)
+    task.add_done_callback(_bg_tasks.discard)
 
 
 @dp.message(Command("start"), F.chat.type == ChatType.PRIVATE)
@@ -252,6 +274,12 @@ async def moderate(msg: Message, bot: Bot) -> None:
         await _require_start(msg, bot)
         return
 
+    # A'zo start bosib yozdi: unga chiqqan "start bosing" xabarini darhol o'chiramiz
+    if user:
+        old = _start_warnings.pop((msg.chat.id, user.id), None)
+        if old is not None:
+            await _safe_delete(old)
+
     reason = find_violation(
         msg,
         delete_photos=chat_setting(msg.chat.id, "photos"),
@@ -273,7 +301,7 @@ async def moderate(msg: Message, bot: Bot) -> None:
     warn = await bot.send_message(
         msg.chat.id, f"⚠️ {name}, guruhda reklama ({reason}) taqiqlangan!"
     )
-    asyncio.create_task(_delete_later(warn, WARN_TTL))
+    schedule_delete(warn, WARN_TTL)
 
 
 async def has_started(user_id: int) -> bool:
@@ -320,7 +348,8 @@ async def _require_start(msg: Message, bot: Bot) -> None:
         f"<b>start</b> bosing, keyin xabaringizni qayta yuboring.",
         reply_markup=kb,
     )
-    asyncio.create_task(_delete_later(warn, max(WARN_TTL, 30)))
+    _start_warnings[key] = warn
+    schedule_delete(warn, START_WARN_TTL, key)
 
 
 async def main() -> None:

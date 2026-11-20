@@ -32,6 +32,8 @@ Har bir guruh sozlamasi alohida `settings.json` faylida saqlanadi.
 bosmaguncha guruhga yoza olmaydi: xabari o'chiriladi va start tugmasi ko'rsatiladi.
 Bot buni o'sha bot nomidan foydalanuvchiga "yozmoqda..." holatini yuborib tekshiradi
 (faqat start bosganlarga yuborish mumkin). Tasdiq 24 soat eslab qolinadi.
+"Start bosing" xabari 1 daqiqadan keyin (`START_WARN_TTL`) yoki a'zo start bosib
+yozishi bilan darhol o'chadi.
 
 ## Sozlamalar (muhit o'zgaruvchilari)
 | O'zgaruvchi | Ma'nosi |
@@ -40,6 +42,7 @@ Bot buni o'sha bot nomidan foydalanuvchiga "yozmoqda..." holatini yuborib tekshi
 | `DELETE_VIDEOS=1` | Videolarni o'chirish (standart qiymat) |
 | `DELETE_PHOTOS=1` | Rasmlarni o'chirish (standart qiymat) |
 | `REQUIRED_BOT_TOKEN=...` | Start bosilishi shart bo'lgan boshqa botning tokeni |
+| `START_WARN_TTL=60` | "Start bosing" xabari necha soniyada o'chadi |
 | `WARN_TTL=10` | Ogohlantirish xabari necha soniyada o'chadi |
 
 Test: `python test_bot.py`
