@@ -178,7 +178,7 @@ async def test_admin_panel(app):
 
     await send(bot, dp, ADMIN, "/reklama_vaqt 30")
     assert "30 daqiqada" in bot.texts_to(ADMIN)[-1]
-    await send(bot, dp, ADMIN, "/reklama_matn Yangi reklama matni")
+    await send(bot, dp, ADMIN, "/reklama_matn2 Yangi reklama matni")
     await click(bot, dp, ADMIN, "adm:ads")
     assert "Yangi reklama matni" in bot.texts_to(ADMIN)[-1] and "Har <b>30</b>" in bot.texts_to(ADMIN)[-1]
 
@@ -338,11 +338,18 @@ async def test_group_ads(app):
     await group_msg(bot, dp, G_ADMIN, 960, "Salom")
     await group_msg(bot, dp, G_MEMBER, 961, "Salom")
 
-    assert await ads.tick() == 1  # faqat admin bo'lgan guruhga
-    posted = [m for m in bot.calls if isinstance(m, SendMessage) and m.chat_id == G_ADMIN]
-    assert len(posted) == 1 and "Toshkentga" in posted[0].text
-    url = posted[0].reply_markup.inline_keyboard[0][0].url
-    assert url == "https://t.me/testbot?start=g1001111111111"
+    def posts():
+        return [m for m in bot.calls if isinstance(m, SendMessage) and m.chat_id == G_ADMIN]
+
+    async def due_with_activity():
+        await group_msg(bot, dp, G_ADMIN, 960, "xabar")
+        await db.execute("UPDATE groups SET last_ad_at='2000-01-01T00:00:00+00:00'")
+
+    # 1-reklama: Farg'ona -> Toshkent, faqat admin bo'lgan guruhga
+    assert await ads.tick() == 1
+    assert "Farg'onadan Toshkentga" in posts()[-1].text
+    url = posts()[-1].reply_markup.inline_keyboard[0][0].url
+    assert url == "https://t.me/testbot?start=g1001111111111_F2T"
     assert not [m for m in bot.calls if isinstance(m, SendMessage) and m.chat_id == G_MEMBER]
 
     # Vaqti kelmagan — qayta joylanmaydi
@@ -350,19 +357,30 @@ async def test_group_ads(app):
     # Vaqti o'tdi, lekin guruhda yangi xabar yo'q — joylanmaydi
     await db.execute("UPDATE groups SET last_ad_at='2000-01-01T00:00:00+00:00'")
     assert await ads.tick() == 0
-    # Yangi xabar keldi — eskisi o'chiriladi, yangisi joylanadi
-    await group_msg(bot, dp, G_ADMIN, 960, "Yana salom")
-    await db.execute("UPDATE groups SET last_ad_at='2000-01-01T00:00:00+00:00'")
+
+    # 2-reklama: Toshkent -> Farg'ona (alohida xabar), 1-si o'chirilmaydi
+    await due_with_activity()
     assert await ads.tick() == 1
-    assert any(isinstance(m, DeleteMessage) and m.chat_id == G_ADMIN for m in bot.calls)
+    assert "Toshkentdan Farg'onaga" in posts()[-1].text
+    assert not [m for m in bot.calls if isinstance(m, DeleteMessage)]
+
+    # 3-reklama: yana Farg'ona -> Toshkent, eski Farg'ona reklamasi o'chiriladi
+    await due_with_activity()
+    first_id = (await db.fetchone("SELECT ad_msg_f2t FROM groups WHERE id=?", G_ADMIN))[0]
+    assert await ads.tick() == 1
+    dels = [m for m in bot.calls if isinstance(m, DeleteMessage)]
+    assert len(dels) == 1 and dels[0].message_id == first_id
+
+    # /reklama_hozir — ikkalasi birdan
+    assert await ads.tick(force=True) == 2
 
     # O'chirilgan bo'lsa — joylanmaydi
     await db.set_setting("ad_enabled", "0")
-    await group_msg(bot, dp, G_ADMIN, 960, "Yana")
-    await db.execute("UPDATE groups SET last_ad_at='2000-01-01T00:00:00+00:00'")
+    await due_with_activity()
     assert await ads.tick() == 0
 
-    # Reklama tugmasi orqali kelgan yo'lovchi
-    await send(bot, dp, 970, "/start g1001111111111")
-    assert "Yo'lovchiman" in bot.texts_to(970)[-1]
+    # Reklama tugmasi orqali kelgan yo'lovchi: yo'nalish tanlangan, tuman so'raladi
+    await send(bot, dp, 970, "/start g1001111111111_T2F")
+    out = bot.texts_to(970)
+    assert "Toshkent ➜ Farg'ona" in out[-2] and "qaysi tumaniga" in out[-1]
     assert await db.count_users_from_ads() == 1

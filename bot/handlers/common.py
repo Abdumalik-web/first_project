@@ -7,7 +7,9 @@ from aiogram.types import CallbackQuery, Message
 
 from .. import texts
 from ..db import Database
+from ..regions import DIRECTIONS
 from ..keyboards import (
+    cancel_kb,
     BTN_CANCEL,
     BTN_HELP,
     BTN_MY,
@@ -27,9 +29,22 @@ async def start(message: Message, state: FSMContext, db: Database,
     u = message.from_user
     await db.upsert_user(u.id, u.full_name, u.username)
     args = (command.args or "") if command else ""
-    if args.startswith("g") and args[1:].isdigit():
+    group_part, _, direction = args.partition("_")
+    if group_part.startswith("g") and group_part[1:].isdigit():
         # Guruhdagi reklama tugmasi orqali kelgan
-        await db.set_user_source(u.id, args[:32])
+        await db.set_user_source(u.id, group_part[:32])
+        if direction in ("F2T", "T2F"):
+            # Yo'nalish reklamadan ma'lum — yo'lovchi so'rovini darhol boshlaymiz
+            from .passenger import next_step
+            await state.set_data({"direction": direction})
+            await message.answer(
+                f"Assalomu alaykum, <b>{texts.escape(u.first_name or '')}</b>! 🚕\n"
+                f"Yo'nalish: <b>{DIRECTIONS[direction]}</b>. Joy band qilamiz — bir necha savol.\n"
+                "Bekor qilish uchun ❌ tugmasini bosing.",
+                reply_markup=cancel_kb(),
+            )
+            await next_step(message, state, db, u.id)
+            return
         await message.answer(
             f"Assalomu alaykum, <b>{texts.escape(u.first_name or '')}</b>! 🚕\n\n"
             "<b>Farg'ona ⇄ Toshkent</b> yo'nalishida sizga eng yaqin haydovchini topamiz.\n\n"

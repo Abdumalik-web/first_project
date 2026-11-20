@@ -112,18 +112,24 @@ undan yo'nalish, tuman, sana, vaqt, kishi soni, telefon va username'ni ajratadi 
 
 ## Guruhlarga avtomatik reklama
 
-Bot **admin** bo'lgan guruhlarga har 10 daqiqada (sozlanadi) reklama joylaydi:
-*«Toshkentdan Farg'onaga va Farg'onadan Toshkentga har kuni yuramiz!»* va
-**«🚕 Joy band qilish»** tugmasi — u botning shaxsiy chatiga olib boradi. U yerda yo'lovchi
-so'rov qoldiradi va bot uni eng yaqin haydovchiga yuboradi.
+Bot **admin** bo'lgan guruhlarga ikki xil reklamani **navbatma-navbat** joylaydi
+(har 10 daqiqada bittadan, sozlanadi):
 
-- Yangi reklamadan oldin eskisi o'chiriladi — guruhda doim bitta reklama turadi.
+1. *«Farg'onadan Toshkentga yuramiz!»* — tugma: **«Farg'ona ➜ Toshkent: joy band qilish»**
+2. *«Toshkentdan Farg'onaga yuramiz!»* — tugma: **«Toshkent ➜ Farg'ona: joy band qilish»**
+
+Tugma botning shaxsiy chatiga olib boradi va yo'lovchi so'rovi **yo'nalish tanlangan holda**
+boshlanadi. Yo'lovchi tumani va joylashuvini kiritadi, bot uni eng yaqin haydovchiga yuboradi.
+
+- Har yo'nalishning yangi reklamasidan oldin o'sha yo'nalishning eskisi o'chiriladi —
+  guruhda har yo'nalishdan bittadan reklama turadi.
 - Oxirgi reklamadan beri guruhda yangi xabar bo'lmasa, qayta joylanmaydi.
 - Bot oddiy a'zo bo'lgan guruhlarga reklama joylamaydi (faqat o'qiydi).
 
 Boshqaruv (admin): `/reklama` (holati), `/reklama_on`, `/reklama_off`, `/reklama_vaqt 30`,
-`/reklama_matn <matn>`, `/reklama_tugma <matn>`, `/reklama_hozir`.
-Botni guruhda admin qilganda **«Delete messages»** va **«Post messages»** huquqlari bo'lsin.
+`/reklama_matn1 <matn>` (Farg'ona ➜ Toshkent), `/reklama_matn2 <matn>` (Toshkent ➜ Farg'ona),
+`/reklama_tugma1`, `/reklama_tugma2`, `/reklama_hozir`.
+Botni guruhda admin qilganda **«Delete messages»** huquqi bo'lsin.
 
 ## Ovozli xabar orqali e'lon
 

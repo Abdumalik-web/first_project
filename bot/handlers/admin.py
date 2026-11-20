@@ -22,8 +22,8 @@ from aiogram.types import (
 )
 
 from .. import texts
-from ..ads import K_BUTTON as AD_BUTTON, K_ENABLED as AD_ENABLED, K_INTERVAL as AD_INTERVAL
-from ..ads import K_TEXT as AD_TEXT, MIN_INTERVAL_MIN, AdService, ad_settings
+from ..ads import K_ENABLED as AD_ENABLED, K_INTERVAL as AD_INTERVAL
+from ..ads import MIN_INTERVAL_MIN, AdService, ad_settings, k_button, k_text
 from ..config import Config
 from ..db import Database
 from ..keyboards import main_menu
@@ -172,17 +172,22 @@ async def _ads_status_text(db: Database) -> str:
     return (
         "📣 <b>Guruh reklamasi</b>\n\n"
         "Holati: " + ("✅ yoqilgan" if cfg["enabled"] else "❌ o'chirilgan") + "\n"
-        f"Har <b>{cfg['interval']}</b> daqiqada (guruhda yangi xabar bo'lsa)\n"
+        f"Har <b>{cfg['interval']}</b> daqiqada bitta reklama, yo'nalishlar navbatma-navbat "
+        "(guruhda yangi xabar bo'lsa)\n"
         f"Reklama orqali botga kelganlar: <b>{came}</b>\n\n"
-        "Reklama faqat bot <b>admin</b> bo'lgan guruhlarga joylanadi. Yangisidan oldin "
-        "eskisi o'chiriladi.\n\n"
+        "Reklama faqat bot <b>admin</b> bo'lgan guruhlarga joylanadi. Har yo'nalishning "
+        "yangisidan oldin eskisi o'chiriladi.\n\n"
         "Buyruqlar:\n"
         "/reklama_on — yoqish, /reklama_off — o'chirish\n"
         f"/reklama_vaqt <i>daqiqa</i> — oraliq (kamida {MIN_INTERVAL_MIN})\n"
-        "/reklama_matn <i>matn</i> — reklama matnini o'zgartirish\n"
-        "/reklama_tugma <i>matn</i> — tugma yozuvini o'zgartirish\n"
-        "/reklama_hozir — hozir barcha guruhlarga joylash\n\n"
-        "<b>Hozirgi matn:</b>\n" + escape(cfg["text"]) + f"\n\n<b>Tugma:</b> {escape(cfg['button'])}"
+        "/reklama_matn1 <i>matn</i> — Farg'ona ➜ Toshkent reklamasi matni\n"
+        "/reklama_matn2 <i>matn</i> — Toshkent ➜ Farg'ona reklamasi matni\n"
+        "/reklama_tugma1, /reklama_tugma2 <i>matn</i> — tugma yozuvlari\n"
+        "/reklama_hozir — hozir barcha guruhlarga ikkala reklamani joylash\n\n"
+        "<b>1) Farg'ona ➜ Toshkent:</b>\n" + escape(cfg["text"]["F2T"])
+        + f"\n<i>Tugma:</i> {escape(cfg['button']['F2T'])}\n\n"
+        "<b>2) Toshkent ➜ Farg'ona:</b>\n" + escape(cfg["text"]["T2F"])
+        + f"\n<i>Tugma:</i> {escape(cfg['button']['T2F'])}"
     )
 
 
@@ -214,17 +219,19 @@ async def ads_interval(message: Message, command: CommandObject, db: Database) -
     await message.answer(f"✅ Reklama endi har {arg} daqiqada joylanadi.")
 
 
-@router.message(Command("reklama_matn", "reklama_tugma"))
+@router.message(Command("reklama_matn1", "reklama_matn2", "reklama_tugma1", "reklama_tugma2"))
 async def ads_text(message: Message, command: CommandObject, db: Database) -> None:
     # Buyruqdan keyingi matn, qator tashlashlar bilan birga
-    text = (message.text or "").split(maxsplit=1)
-    value = text[1].strip() if len(text) > 1 else ""
-    is_button = command.command == "reklama_tugma"
+    parts = (message.text or "").split(maxsplit=1)
+    value = parts[1].strip() if len(parts) > 1 else ""
+    cmd = command.command
+    direction = "F2T" if cmd.endswith("1") else "T2F"
+    is_button = cmd.startswith("reklama_tugma")
     limit = 60 if is_button else 1000
     if not value or len(value) > limit:
         await message.answer(f"Buyruqdan keyin matnni yozing ({limit} belgigacha).")
         return
-    await db.set_setting(AD_BUTTON if is_button else AD_TEXT, value)
+    await db.set_setting(k_button(direction) if is_button else k_text(direction), value)
     await message.answer("✅ Saqlandi. Keyingi reklamada yangi matn chiqadi.")
 
 

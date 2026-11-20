@@ -118,6 +118,9 @@ class Database:
         await self._ensure_column("groups", "last_ad_msg_id", "INTEGER")
         await self._ensure_column("groups", "last_ad_at", "TEXT")
         await self._ensure_column("groups", "msgs_since_ad", "INTEGER NOT NULL DEFAULT 1")
+        await self._ensure_column("groups", "ad_msg_f2t", "INTEGER")
+        await self._ensure_column("groups", "ad_msg_t2f", "INTEGER")
+        await self._ensure_column("groups", "last_ad_dir", "TEXT")
         await self.conn.commit()
 
     async def _ensure_column(self, table: str, column: str, ddl: str) -> None:
@@ -505,15 +508,17 @@ class Database:
             before_iso,
         )
 
-    async def set_group_ad(self, chat_id: int, msg_id: int | None, at_iso: str) -> None:
+    async def set_group_ad(self, chat_id: int, direction: str | None, msg_id: int | None,
+                           at_iso: str) -> None:
         """msg_id None bo'lsa — reklama joylanmadi (admin emas), faqat vaqt yangilanadi."""
         if msg_id is None:
             await self.execute("UPDATE groups SET last_ad_at=? WHERE id=?", at_iso, chat_id)
-        else:
-            await self.execute(
-                "UPDATE groups SET last_ad_msg_id=?, last_ad_at=?, msgs_since_ad=0 WHERE id=?",
-                msg_id, at_iso, chat_id,
-            )
+            return
+        col = "ad_msg_f2t" if direction == "F2T" else "ad_msg_t2f"
+        await self.execute(
+            f"UPDATE groups SET {col}=?, last_ad_dir=?, last_ad_at=?, msgs_since_ad=0 WHERE id=?",
+            msg_id, direction, at_iso, chat_id,
+        )
 
     async def set_user_source(self, uid: int, source: str) -> None:
         await self.execute("UPDATE users SET source=? WHERE id=? AND source IS NULL", source, uid)

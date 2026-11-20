@@ -1,9 +1,13 @@
 """Bot admin bo'lgan guruhlarga muntazam reklama joylash.
 
-- Har `interval` daqiqada bir marta (standart 10).
-- Yangi reklamadan oldin eskisi o'chiriladi — guruhda doim bitta reklama turadi.
+- Ikki xil reklama: «Farg'onadan Toshkentga» va «Toshkentdan Farg'onaga».
+  Ular navbatma-navbat, har `interval` daqiqada bittadan joylanadi.
+- Har yo'nalishning yangi reklamasidan oldin o'sha yo'nalishning eskisi o'chiriladi —
+  guruhda har yo'nalishdan bittadan reklama turadi.
 - Oxirgi reklamadan beri guruhda yangi xabar bo'lmasa, qayta joylanmaydi.
 - Faqat bot admin bo'lgan guruhlarda.
+- Tugma botga `?start=g<guruh>_<yo'nalish>` bilan olib boradi: yo'lovchi so'rovi
+  yo'nalishi tanlangan holda boshlanadi.
 """
 from __future__ import annotations
 
@@ -16,44 +20,68 @@ from aiogram.exceptions import TelegramAPIError
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from .db import Database, now_iso
+from .regions import FROM_TASHKENT, TO_TASHKENT
 
 log = logging.getLogger(__name__)
 
-DEFAULT_TEXT = (
-    "🚕 Farg'ona ⇄ Toshkent taksi\n\n"
-    "Toshkentdan Farg'onaga va Farg'onadan Toshkentga har kuni yuramiz!\n\n"
-    "✅ Sizga eng yaqin haydovchini topamiz\n"
-    "✅ Uyingizdan olib ketamiz\n"
-    "✅ 1 daqiqada joy band qiling\n\n"
-    "👇 Pastdagi tugmani bosing"
-)
-DEFAULT_BUTTON = "🚕 Joy band qilish"
+DEFAULT_TEXTS = {
+    TO_TASHKENT: (
+        "🚕 Farg'onadan Toshkentga yuramiz!\n\n"
+        "Farg'ona viloyatining barcha tumanlaridan Toshkentga har kuni qatnaymiz.\n\n"
+        "✅ Sizga eng yaqin haydovchini topamiz\n"
+        "✅ Uyingizdan olib ketamiz\n"
+        "✅ 1 daqiqada joy band qiling\n\n"
+        "👇 Pastdagi tugmani bosing"
+    ),
+    FROM_TASHKENT: (
+        "🚕 Toshkentdan Farg'onaga yuramiz!\n\n"
+        "Toshkentning istalgan tumanidan Farg'ona viloyatiga har kuni qatnaymiz.\n\n"
+        "✅ Sizga eng yaqin haydovchini topamiz\n"
+        "✅ Turgan joyingizdan olib ketamiz\n"
+        "✅ 1 daqiqada joy band qiling\n\n"
+        "👇 Pastdagi tugmani bosing"
+    ),
+}
+DEFAULT_BUTTONS = {
+    TO_TASHKENT: "🚕 Farg'ona ➜ Toshkent: joy band qilish",
+    FROM_TASHKENT: "🚕 Toshkent ➜ Farg'ona: joy band qilish",
+}
 DEFAULT_INTERVAL_MIN = 10
 MIN_INTERVAL_MIN = 5
 
 # settings jadvalidagi kalitlar
-K_ENABLED, K_INTERVAL, K_TEXT, K_BUTTON = "ad_enabled", "ad_interval_min", "ad_text", "ad_button"
+K_ENABLED, K_INTERVAL = "ad_enabled", "ad_interval_min"
+
+
+def k_text(direction: str) -> str:
+    return f"ad_text_{direction.lower()}"
+
+
+def k_button(direction: str) -> str:
+    return f"ad_button_{direction.lower()}"
 
 
 async def ad_settings(db: Database) -> dict:
-    return {
+    cfg = {
         "enabled": await db.get_setting(K_ENABLED, "1") == "1",
         "interval": int(await db.get_setting(K_INTERVAL, str(DEFAULT_INTERVAL_MIN))),
-        "text": await db.get_setting(K_TEXT, DEFAULT_TEXT),
-        "button": await db.get_setting(K_BUTTON, DEFAULT_BUTTON),
+        "text": {},
+        "button": {},
     }
+    for d in (TO_TASHKENT, FROM_TASHKENT):
+        cfg["text"][d] = await db.get_setting(k_text(d), DEFAULT_TEXTS[d])
+        cfg["button"][d] = await db.get_setting(k_button(d), DEFAULT_BUTTONS[d])
+    return cfg
+
+
+def next_direction(last: str | None) -> str:
+    return FROM_TASHKENT if last == TO_TASHKENT else TO_TASHKENT
 
 
 class AdService:
     def __init__(self, bot: Bot, db: Database):
         self.bot = bot
         self.db = db
-        self._me = None
-
-    async def bot_username(self) -> str:
-        if self._me is None:
-            self._me = await self.bot.me()
-        return self._me.username
 
     async def is_admin_in(self, chat_id: int) -> bool:
         me = await self.bot.me()
@@ -64,30 +92,36 @@ class AdService:
             return False
         return member.status in ("administrator", "creator")
 
-    async def post(self, group, cfg: dict) -> bool:
-        """Bitta guruhga reklama joylaydi. Muvaffaqiyatli bo'lsa True."""
+    async def post(self, group, cfg: dict, direction: str) -> bool:
+        """Bitta guruhga bitta yo'nalish reklamasini joylaydi. Muvaffaqiyatli bo'lsa True."""
         chat_id = group["id"]
         if not await self.is_admin_in(chat_id):
-            await self.db.set_group_ad(chat_id, None, now_iso())
+            await self.db.set_group_ad(chat_id, None, None, now_iso())
             return False
-        url = f"https://t.me/{await self.bot_username()}?start=g{abs(chat_id)}"
-        kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=cfg["button"], url=url)]])
-        if group["last_ad_msg_id"]:
+        me = await self.bot.me()
+        url = f"https://t.me/{me.username}?start=g{abs(chat_id)}_{direction}"
+        kb = InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(text=cfg["button"][direction], url=url)
+        ]])
+        old_id = group["ad_msg_f2t"] if direction == TO_TASHKENT else group["ad_msg_t2f"]
+        if old_id:
             try:
-                await self.bot.delete_message(chat_id, group["last_ad_msg_id"])
+                await self.bot.delete_message(chat_id, old_id)
             except TelegramAPIError:
                 pass  # allaqachon o'chirilgan yoki o'chirish huquqi yo'q
         try:
-            msg = await self.bot.send_message(chat_id, cfg["text"], reply_markup=kb, parse_mode=None)
+            msg = await self.bot.send_message(chat_id, cfg["text"][direction], reply_markup=kb,
+                                              parse_mode=None)
         except TelegramAPIError as e:
             log.warning("reklama %s (%s): %s", group["title"], chat_id, e)
-            await self.db.set_group_ad(chat_id, None, now_iso())
+            await self.db.set_group_ad(chat_id, None, None, now_iso())
             return False
-        await self.db.set_group_ad(chat_id, msg.message_id, now_iso())
-        log.info("Reklama joylandi: %s", group["title"])
+        await self.db.set_group_ad(chat_id, direction, msg.message_id, now_iso())
+        log.info("Reklama joylandi (%s): %s", direction, group["title"])
         return True
 
     async def tick(self, force: bool = False) -> int:
+        """force=True — hamma guruhga ikkala reklamani hozir joylaydi."""
         cfg = await ad_settings(self.db)
         if not cfg["enabled"] and not force:
             return 0
@@ -98,9 +132,12 @@ class AdService:
             groups = await self.db.groups_due_for_ad(before)
         n = 0
         for g in groups:
-            if await self.post(g, cfg):
-                n += 1
-            await asyncio.sleep(0.2)
+            directions = [TO_TASHKENT, FROM_TASHKENT] if force else [next_direction(g["last_ad_dir"])]
+            for d in directions:
+                g = await self.db.fetchone("SELECT * FROM groups WHERE id=?", g["id"])
+                if await self.post(g, cfg, d):
+                    n += 1
+                await asyncio.sleep(0.2)
         return n
 
     async def run_loop(self, every_sec: int = 60) -> None:
