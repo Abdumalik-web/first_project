@@ -22,9 +22,16 @@ Adminlar xabarlariga tegmaydi.
 |---|---|
 | `/rasm` | Oddiy a'zolar rasmlarini o'chirishni yoqadi / o'chiradi |
 | `/video` | Oddiy a'zolar videolarini o'chirishni yoqadi / o'chiradi |
+| `/majburiy` | Guruhga yozishdan oldin botga start bosishni majburiy qiladi / bekor qiladi |
 | `/sozlamalar` | Joriy sozlamalarni ko'rsatadi |
 
 Har bir guruh sozlamasi alohida `settings.json` faylida saqlanadi.
+
+## Boshqa botga start bosish majburiyati
+`REQUIRED_BOT_TOKEN` ga boshqa botingiz tokeni berilsa, a'zolar o'sha botga start
+bosmaguncha guruhga yoza olmaydi: xabari o'chiriladi va start tugmasi ko'rsatiladi.
+Bot buni o'sha bot nomidan foydalanuvchiga "yozmoqda..." holatini yuborib tekshiradi
+(faqat start bosganlarga yuborish mumkin). Tasdiq 24 soat eslab qolinadi.
 
 ## Sozlamalar (muhit o'zgaruvchilari)
 | O'zgaruvchi | Ma'nosi |
@@ -32,6 +39,7 @@ Har bir guruh sozlamasi alohida `settings.json` faylida saqlanadi.
 | `BLOCK_ALL_LINKS=1` | Har qanday havolani o'chiradi (`0` - faqat ro'yxatdagi saytlar) |
 | `DELETE_VIDEOS=1` | Videolarni o'chirish (standart qiymat) |
 | `DELETE_PHOTOS=1` | Rasmlarni o'chirish (standart qiymat) |
+| `REQUIRED_BOT_TOKEN=...` | Start bosilishi shart bo'lgan boshqa botning tokeni |
 | `WARN_TTL=10` | Ogohlantirish xabari necha soniyada o'chadi |
 
 Test: `python test_bot.py`

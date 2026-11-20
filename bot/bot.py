@@ -18,9 +18,9 @@ import re
 
 from aiogram import Bot, Dispatcher, F
 from aiogram.enums import ChatMemberStatus, ChatType, MessageEntityType
-from aiogram.exceptions import TelegramBadRequest
+from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
 from aiogram.filters import Command
-from aiogram.types import Message
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message
 
 logging.basicConfig(level=logging.INFO)
 
@@ -33,6 +33,13 @@ DELETE_VIDEOS = os.getenv("DELETE_VIDEOS", "0") == "1"
 DELETE_PHOTOS = os.getenv("DELETE_PHOTOS", "0") == "1"
 # Guruhlar sozlamalari saqlanadigan fayl
 SETTINGS_FILE = os.getenv("SETTINGS_FILE", os.path.join(os.path.dirname(os.path.abspath(__file__)), "settings.json"))
+# A'zolar guruhga yozishdan oldin start bosishi shart bo'lgan boshqa botning tokeni (ixtiyoriy).
+# Berilsa, o'sha botga start bosmaganlar guruhga yoza olmaydi.
+REQUIRED_BOT_TOKEN = os.getenv("REQUIRED_BOT_TOKEN", "").strip().strip('"').strip("'").strip()
+# "1" bo'lsa start bosish majburiy (guruhda /majburiy bilan o'zgartiriladi)
+REQUIRE_START = os.getenv("REQUIRE_START", "1" if REQUIRED_BOT_TOKEN else "0") == "1"
+# Shu botning o'ziga /start bosganlar ro'yxati (REQUIRED_BOT_TOKEN berilmaganda ishlatiladi)
+USERS_FILE = os.getenv("USERS_FILE", os.path.join(os.path.dirname(os.path.abspath(__file__)), "users.json"))
 # Ogohlantirish xabari necha soniyadan keyin o'chsin
 WARN_TTL = int(os.getenv("WARN_TTL", "10"))
 
@@ -64,8 +71,36 @@ _settings: dict = _load_settings()
 
 
 def chat_setting(chat_id: int, key: str) -> bool:
-    defaults = {"photos": DELETE_PHOTOS, "videos": DELETE_VIDEOS}
+    defaults = {"photos": DELETE_PHOTOS, "videos": DELETE_VIDEOS, "start": REQUIRE_START}
     return _settings.get(str(chat_id), {}).get(key, defaults[key])
+
+
+def _load_users() -> set[int]:
+    try:
+        with open(USERS_FILE, encoding="utf-8") as f:
+            return set(json.load(f))
+    except (OSError, ValueError):
+        return set()
+
+
+_started_users: set[int] = _load_users()
+# Boshqa botga start bosgani tasdiqlangan foydalanuvchilar: user_id -> tekshirilgan vaqt
+_verified: dict[int, float] = {}
+VERIFY_TTL = 24 * 3600  # tasdiq 24 soatdan keyin qayta tekshiriladi
+_required_bot: Bot | None = None
+# (chat_id, user_id) -> oxirgi ogohlantirish vaqti (spam bo'lmasligi uchun)
+_last_start_warn: dict[tuple[int, int], float] = {}
+
+
+def mark_started(user_id: int) -> None:
+    if user_id in _started_users:
+        return
+    _started_users.add(user_id)
+    try:
+        with open(USERS_FILE, "w", encoding="utf-8") as f:
+            json.dump(sorted(_started_users), f)
+    except OSError as e:
+        logging.warning("Foydalanuvchini saqlab bo'lmadi: %s", e)
 
 
 def set_chat_setting(chat_id: int, key: str, value: bool) -> None:
@@ -131,13 +166,14 @@ async def _delete_later(msg: Message, delay: int) -> None:
         pass
 
 
-@dp.message(Command("start"))
+@dp.message(Command("start"), F.chat.type == ChatType.PRIVATE)
 async def start(msg: Message) -> None:
+    if msg.from_user:
+        mark_started(msg.from_user.id)
     await msg.answer(
-        "Salom! Meni guruhga qo'shing va <b>admin</b> qiling "
-        "(\"Xabarlarni o'chirish\" huquqi bilan).\n"
-        "Men reklama havolalari, Instagram/YouTube linklari va "
-        "forward qilingan reklamalarni avtomatik o'chiraman."
+        "Salom! Guruh egalari uchun: meni guruhga qo'shing va <b>admin</b> qiling "
+        "(\"Xabarlarni o'chirish\" huquqi bilan). Men reklama havolalari, "
+        "Instagram/YouTube linklari va forward qilingan reklamalarni avtomatik o'chiraman."
     )
 
 
@@ -166,9 +202,20 @@ async def toggle_videos(msg: Message, bot: Bot) -> None:
     await _toggle(msg, bot, "videos", "Videolar")
 
 
+@dp.message(Command("majburiy"), GROUPS)
+async def toggle_require_start(msg: Message, bot: Bot) -> None:
+    if not msg.from_user or not await is_admin(bot, msg.chat.id, msg.from_user.id):
+        return
+    new = not chat_setting(msg.chat.id, "start")
+    set_chat_setting(msg.chat.id, "start", new)
+    await msg.answer("Yozishdan oldin botga /start bosish: " + ("✅ majburiy" if new else "❌ majburiy emas"))
+
+
 @dp.message(Command("sozlamalar"), GROUPS)
 async def show_settings(msg: Message) -> None:
+    req = "✅ majburiy" if chat_setting(msg.chat.id, "start") else "❌ majburiy emas"
     await msg.answer(
+        f"Botga /start bosish: {req}  (/majburiy)\n"
         "Havolalar va reklama: ✅ o'chiriladi\n"
         f"Rasmlar: {_on_off(chat_setting(msg.chat.id, 'photos'))}  (/rasm)\n"
         f"Videolar: {_on_off(chat_setting(msg.chat.id, 'videos'))}  (/video)\n"
@@ -192,6 +239,17 @@ async def moderate(msg: Message, bot: Bot) -> None:
     if msg.sender_chat and msg.sender_chat.id == msg.chat.id:
         return
     if msg.is_automatic_forward:
+        return
+
+    user = msg.from_user
+    if (
+        user
+        and not user.is_bot
+        and chat_setting(msg.chat.id, "start")
+        and not await has_started(user.id)
+        and not await is_admin(bot, msg.chat.id, user.id)
+    ):
+        await _require_start(msg, bot)
         return
 
     reason = find_violation(
@@ -218,6 +276,53 @@ async def moderate(msg: Message, bot: Bot) -> None:
     asyncio.create_task(_delete_later(warn, WARN_TTL))
 
 
+async def has_started(user_id: int) -> bool:
+    """Foydalanuvchi kerakli botga start bosganmi?"""
+    if _required_bot is None:
+        return user_id in _started_users
+
+    now = asyncio.get_running_loop().time()
+    if now - _verified.get(user_id, -1e12) < VERIFY_TTL:
+        return True
+    try:
+        # Bot faqat start bosgan foydalanuvchiga "yozmoqda..." ko'rsata oladi.
+        await _required_bot.send_chat_action(user_id, "typing")
+    except (TelegramForbiddenError, TelegramBadRequest):
+        return False
+    except Exception as e:  # tarmoq xatosi: a'zoni bekorga bloklamaymiz
+        logging.warning("Start tekshiruvi ishlamadi: %s", e)
+        return True
+    _verified[user_id] = now
+    return True
+
+
+async def _require_start(msg: Message, bot: Bot) -> None:
+    """Botga /start bosmagan a'zoning xabarini o'chirib, start tugmasini ko'rsatadi."""
+    try:
+        await msg.delete()
+    except TelegramBadRequest as e:
+        logging.warning("O'chirib bo'lmadi (bot adminmi?): %s", e)
+        return
+
+    key = (msg.chat.id, msg.from_user.id)
+    now = asyncio.get_running_loop().time()
+    if now - _last_start_warn.get(key, -1e9) < 60:
+        return  # bir daqiqada bir martadan ko'p ogohlantirmaymiz
+    _last_start_warn[key] = now
+
+    me = await (_required_bot or bot).me()
+    kb = InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text="▶️ Botga start bosish", url=f"https://t.me/{me.username}?start=guruh")
+    ]])
+    warn = await bot.send_message(
+        msg.chat.id,
+        f"👋 {msg.from_user.mention_html()}, guruhga yozish uchun avval botga "
+        f"<b>start</b> bosing, keyin xabaringizni qayta yuboring.",
+        reply_markup=kb,
+    )
+    asyncio.create_task(_delete_later(warn, max(WARN_TTL, 30)))
+
+
 async def main() -> None:
     token = BOT_TOKEN
     if not token:
@@ -235,6 +340,11 @@ async def main() -> None:
     from aiogram.client.default import DefaultBotProperties
 
     bot = Bot(token, default=DefaultBotProperties(parse_mode="HTML"))
+    global _required_bot
+    if REQUIRED_BOT_TOKEN:
+        _required_bot = Bot(REQUIRED_BOT_TOKEN)
+        req = await _required_bot.me()
+        print(f"Guruhga yozish uchun start bosilishi kerak bo'lgan bot: @{req.username}")
     me = await bot.get_me()
     print(f"Bot ishga tushdi: @{me.username}  (to'xtatish uchun Ctrl+C)")
     await dp.start_polling(bot, allowed_updates=["message", "edited_message"])

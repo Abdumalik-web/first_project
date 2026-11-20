@@ -2,3 +2,4 @@ __pycache__/
 *.pyc
 .env
 bot/settings.json
+bot/users.json

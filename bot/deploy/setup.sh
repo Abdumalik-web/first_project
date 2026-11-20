@@ -26,6 +26,13 @@ if [ ! -f /etc/reklama_bot.env ]; then
   chmod 600 /etc/reklama_bot.env
 fi
 
+if ! grep -q '^REQUIRED_BOT_TOKEN=' /etc/reklama_bot.env; then
+  echo "Guruhga yozishdan oldin a'zolar start bosishi kerak bo'lgan boshqa bot bormi?"
+  read -rsp "Bor bo'lsa o'sha botning tokenini kiriting, yo'q bo'lsa shunchaki Enter bosing: " REQ; echo
+  REQ="${REQ//\"/}"
+  echo "REQUIRED_BOT_TOKEN=$REQ" >> /etc/reklama_bot.env
+fi
+
 cat > /etc/systemd/system/reklama_bot.service <<UNIT
 [Unit]
 Description=Reklama o'chiruvchi Telegram bot
