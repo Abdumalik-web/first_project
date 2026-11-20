@@ -261,7 +261,7 @@ async def trips_status(message: Message, db: Database) -> None:
         "Holati: " + ("✅ yoqilgan" if on else "❌ o'chirilgan") + "\n"
         f"Har <b>{interval}</b> daqiqada har bir e'lon yangilanadi (eskisi o'chiriladi)\n"
         f"Hozir joylanayotgan e'lonlar: <b>{len(trips)}</b>\n\n"
-        "Faqat haydovchi rozilik bergan e'lonlar va faqat bot admin bo'lgan guruhlarga. "
+        "Barcha faol e'lonlar (haydovchi o'zi o'chirib qo'ymagan bo'lsa), faqat bot admin bo'lgan guruhlarga. "
         "E'lon yopilsa yoki joy qolmasa — guruhdan o'chiriladi.\n\n"
         "/elon_on, /elon_off — yoqish / o'chirish\n"
         f"/elon_vaqt <i>daqiqa</i> — oraliq (kamida {MIN_INTERVAL_MIN})\n"
@@ -292,7 +292,8 @@ async def trips_now(message: Message, ads: AdService) -> None:
     n = await ads.tick_trips(force=True)
     await message.answer(
         f"🚗 {n} ta e'lon guruhlarga joylandi." if n else
-        "Hech narsa joylanmadi: guruhga joylashga rozi bo'lgan faol e'lon yo'q yoki bot hech bir guruhda admin emas."
+        "Hech narsa joylanmadi: bo'sh joyi bor faol e'lon yo'q yoki bot hech bir guruhda admin emas "
+        "(/reklama da guruhlar holatini ko'ring)."
     )
 
 

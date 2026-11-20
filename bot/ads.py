@@ -194,6 +194,18 @@ class AdService:
             n += 1
         return n
 
+    async def _notify_driver(self, t) -> None:
+        try:
+            await self.bot.send_message(
+                t["driver_id"],
+                f"📢 E'loningiz #{t['id']} guruhlarga joylandi — telefon raqamingiz va Telegram "
+                "akkauntingiz bilan. Har soatda yangilanadi, joylar to'lsa yoki e'lon yopilsa "
+                "guruhdan o'chiriladi.\n\n"
+                "Guruhda ko'rinmasin desangiz: «📋 Mening e'lonlarim» ➜ «📢 Guruhlarga joylash».",
+            )
+        except TelegramAPIError as e:
+            log.info("notify driver %s: %s", t["driver_id"], e)
+
     async def tick_trips(self, force: bool = False) -> int:
         """Rozi bo'lgan haydovchilar e'lonlarini har `interval` daqiqada guruhlarga joylaydi.
 
@@ -235,6 +247,8 @@ class AdService:
                     log.warning("e'lon #%s -> %s: %s", t["id"], g["title"], e)
                     continue
                 await self.db.save_trip_post(t["id"], g["id"], msg.message_id)
+                if await self.db.mark_publish_notified(t["id"]):
+                    await self._notify_driver(t)
                 sent += 1
                 per_group += 1
                 await asyncio.sleep(0.3)

@@ -137,8 +137,8 @@ Botni guruhda admin qilganda **«Delete messages»** huquqi bo'lsin.
 
 ## Haydovchi e'lonlarini guruhlarga joylash
 
-E'lon berishda bot haydovchidan so'raydi: *«E'loningiz guruhlarga ham joylansinmi?»*
-Rozi bo'lsa, bot admin bo'lgan guruhlarga **har soatda** (sozlanadi) shunday post joylaydi:
+Har bir haydovchi e'loni bot admin bo'lgan guruhlarga **har soatda** (sozlanadi) avtomatik joylanadi
+(haydovchidan so'ralmaydi; birinchi joylanganda haydovchiga bu haqda xabar boradi):
 yo'nalish (tumanlar ➜ Toshkent yoki aksincha), sana va vaqt, bo'sh joylar, mashina, narx,
 **telefon raqami va Telegram akkaunti**, hamda «Bot orqali joy band qilish» tugmasi.
 

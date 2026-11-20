@@ -108,10 +108,9 @@ async def test_full_flow(app):
     await send(bot, dp, D, "150 000")
     await send(bot, dp, D, contact=Contact(phone_number="998901112233", first_name="D"))
     await send(bot, dp, D, location=Location(latitude=40.53, longitude=70.94))
-    assert "guruhlarga" in bot.texts_to(D)[-1]
-    await click(bot, dp, D, "dr:pub:1")
-    assert "Guruhlarga: joylanadi" in bot.texts_to(D)[-1]
+    assert "guruhlarga ham joylanadi" in bot.texts_to(D)[-1]
     await click(bot, dp, D, "dr:ok")
+    assert (await db.active_trips_of(D))[0]["publish"] == 1
     trips = await db.active_trips_of(D)
     assert len(trips) == 1 and trips[0]["districts"] == "qoqon,dangara,buvayda"
 
@@ -426,8 +425,10 @@ async def test_driver_trips_posted_to_admin_groups(app):
     def posts():
         return [m for m in bot.calls if isinstance(m, SendMessage) and m.chat_id == G]
 
-    assert await ads.tick_trips() == 1  # faqat rozi bo'lgan haydovchi
+    assert await ads.tick_trips() == 1  # o'chirib qo'ygan haydovchi joylanmaydi
     txt = posts()[-1].text
+    # Haydovchiga bir martalik xabar
+    assert any("guruhlarga joylandi" in x for x in bot.texts_to(D_YES))
     assert "Toshkent ➜ Qo'qon, Dang'ara" in txt and "+998900000981" in txt and "@user981" in txt
     assert "Cobalt oq" in txt and "150 000" in txt and "Bo'sh joy: <b>3</b>" in txt
     assert "+998900000982" not in txt
@@ -439,6 +440,7 @@ async def test_driver_trips_posted_to_admin_groups(app):
     first_msg = (await db.get_trip_post(t_yes, G))["message_id"]
     assert await ads.tick_trips() == 1
     assert any(isinstance(m, DeleteMessage) and m.message_id == first_msg for m in bot.calls)
+    assert sum("guruhlarga joylandi" in x for x in bot.texts_to(D_YES)) == 1  # takrorlanmaydi
 
     # Joylar to'lsa — guruhdan o'chiriladi va boshqa joylanmaydi
     await db.execute("UPDATE trips SET seats_free=0 WHERE id=?", t_yes)

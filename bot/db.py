@@ -130,6 +130,12 @@ class Database:
         await self._ensure_column("groups", "ad_msg_t2f", "INTEGER")
         await self._ensure_column("groups", "last_ad_dir", "TEXT")
         await self._ensure_column("trips", "publish", "INTEGER NOT NULL DEFAULT 0")
+        await self._ensure_column("trips", "publish_notified", "INTEGER NOT NULL DEFAULT 0")
+        # Bir martalik: e'lonlar endi so'ramasdan guruhlarga joylanadi — mavjud faollarini yoqamiz
+        done = await self.fetchone("SELECT 1 FROM settings WHERE key='migr_publish_all'")
+        if not done:
+            await self.conn.execute("UPDATE trips SET publish=1 WHERE status='active'")
+            await self.conn.execute("INSERT INTO settings(key, value) VALUES('migr_publish_all','1')")
         await self.conn.commit()
 
     async def _ensure_column(self, table: str, column: str, ddl: str) -> None:
@@ -576,3 +582,10 @@ class Database:
         await self.execute("UPDATE trips SET publish = 1 - publish WHERE id=?", trip_id)
         row = await self.fetchone("SELECT publish FROM trips WHERE id=?", trip_id)
         return bool(row and row["publish"])
+
+    async def mark_publish_notified(self, trip_id: int) -> bool:
+        """Haydovchiga «guruhga joylandi» xabari hali yuborilmagan bo'lsa True qaytaradi va belgilaydi."""
+        n = await self._exec_count(
+            "UPDATE trips SET publish_notified=1 WHERE id=? AND publish_notified=0", trip_id
+        )
+        return n == 1
