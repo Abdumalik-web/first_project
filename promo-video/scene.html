@@ -195,14 +195,14 @@ const sceneAlpha=(t,a,b,f=.3)=>clamp(Math.min(P(t,a,a+f), 1-P(t,b-f,b)));
 
 // subtitle timeline (matches voice offsets in build script)
 const SUBS=[
-  {a:0.20,b:2.91,text:"Haydovchimisiz yoki yo‘lovchimisiz?"},
-  {a:3.10,b:6.68,text:"Botimiz haydovchi va yo‘lovchilarni birlashtiradi."},
-  {a:6.90,b:10.57,text:"Manzilingizga yeting, chegirma va bonuslar oling!"},
-  {a:10.80,b:14.91,text:"Batafsil Telegram sahifamizda. Hoziroq qo‘shiling!"},
+  {a:0.45,b:2.36,text:"Haydovchimisiz yoki yo‘lovchimisiz?"},
+  {a:3.35,b:5.75,text:"Botimiz haydovchi va yo‘lovchilarni birlashtiradi."},
+  {a:7.15,b:9.79,text:"Manzilingizga yeting, chegirma va bonuslar oling!"},
+  {a:11.05,b:14.79,text:"Batafsil Telegram sahifamizda. Hoziroq qo‘shiling!"},
 ];
 let lastSub=-1;
 function renderSubs(t){
-  let idx=SUBS.findIndex(s=>t>=s.a-0.05&&t<=s.b+0.15);
+  let idx=SUBS.findIndex(s=>t>=s.a-0.05&&t<=s.b+0.6);
   const el=$('subs');
   if(idx<0){el.style.opacity=0;return;}
   const s=SUBS[idx];
@@ -211,7 +211,7 @@ function renderSubs(t){
   const lens=[...ws].map(w=>w.textContent.length+2); const tot=lens.reduce((a,b)=>a+b,0);
   const prog=P(t,s.a,s.b)*tot; let acc=0;
   ws.forEach((w,i)=>{w.classList.toggle('on',prog>acc);acc+=lens[i];});
-  el.style.opacity=clamp(Math.min(P(t,s.a-0.05,s.a+0.1),1-P(t,s.b,s.b+0.15)));
+  el.style.opacity=clamp(Math.min(P(t,s.a-0.05,s.a+0.1),1-P(t,s.b,s.b+0.6)));
 }
 
 const road=$('roadPath'); const roadLen=road.getTotalLength();
