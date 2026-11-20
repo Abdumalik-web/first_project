@@ -126,10 +126,11 @@ boshlanadi. Yo'lovchi tumani va joylashuvini kiritadi, bot uni eng yaqin haydovc
 
 - Har yo'nalishning yangi reklamasidan oldin o'sha yo'nalishning eskisi o'chiriladi —
   guruhda har yo'nalishdan bittadan reklama turadi.
-- Oxirgi reklamadan beri guruhda yangi xabar bo'lmasa, qayta joylanmaydi.
+- Oxirgi reklamadan beri guruhda yangi xabar bo'lmasa, qayta joylanmaydi
+  (o'chirish: `/reklama_faollik_off` — shunda har safar joylanadi).
 - Bot oddiy a'zo bo'lgan guruhlarga reklama joylamaydi (faqat o'qiydi).
 
-Boshqaruv (admin): `/reklama` (holati), `/reklama_on`, `/reklama_off`, `/reklama_vaqt 30`,
+Boshqaruv (admin): `/reklama` (holati va har bir guruh nima uchun kutayotgani), `/reklama_on`, `/reklama_off`, `/reklama_vaqt 30`,
 `/reklama_matn1 <matn>` (Farg'ona ➜ Toshkent), `/reklama_matn2 <matn>` (Toshkent ➜ Farg'ona),
 `/reklama_tugma1`, `/reklama_tugma2`, `/reklama_hozir`.
 Botni guruhda admin qilganda **«Delete messages»** huquqi bo'lsin.

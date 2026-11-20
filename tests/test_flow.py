@@ -373,6 +373,19 @@ async def test_group_ads(app):
     assert await ads.tick() == 1
     dels = [m for m in bot.calls if isinstance(m, DeleteMessage)]
     assert len(dels) == 1 and dels[0].message_id == first_id
+    await click(bot, dp, 900, "adm:ads")
+    assert "Guruhlar:" in bot.texts_to(900)[-1]
+
+    # Faollik qoidasi o'chirilsa — yangi xabarsiz ham joylanadi
+    await db.set_setting("ad_require_activity", "0")
+    await db.execute("UPDATE groups SET last_ad_at='2000-01-01T00:00:00+00:00'")
+    assert await ads.tick() == 1
+    status = await ads.group_status()
+    assert any("admin emas" in x for x in status) and any("navbatdagi" in x for x in status)
+    await db.set_setting("ad_require_activity", "1")
+    await db.execute("UPDATE groups SET last_ad_at='2000-01-01T00:00:00+00:00'")
+    assert await ads.tick() == 0
+    assert any("yangi xabar yo'q" in x for x in await ads.group_status())
 
     # /reklama_hozir — ikkalasi birdan
     assert await ads.tick(force=True) == 2

@@ -22,7 +22,7 @@ from aiogram.types import (
 )
 
 from .. import texts
-from ..ads import K_ENABLED as AD_ENABLED, K_INTERVAL as AD_INTERVAL
+from ..ads import K_ACTIVITY as AD_ACTIVITY, K_ENABLED as AD_ENABLED, K_INTERVAL as AD_INTERVAL
 from ..ads import MIN_INTERVAL_MIN, AdService, ad_settings, k_button, k_text
 from ..config import Config
 from ..db import Database
@@ -166,14 +166,19 @@ async def groups(cb: CallbackQuery, db: Database) -> None:
     await cb.answer()
 
 
-async def _ads_status_text(db: Database) -> str:
+async def _ads_status_text(db: Database, ads: AdService) -> str:
     cfg = await ad_settings(db)
     came = await db.count_users_from_ads()
+    groups = await ads.group_status()
+    activity = ("faqat guruhda yangi xabar bo'lsa (o'chirish: /reklama_faollik_off)"
+                if cfg["require_activity"] else
+                "guruhda yangi xabar bo'lmasa ham (yoqish: /reklama_faollik_on)")
     return (
         "📣 <b>Guruh reklamasi</b>\n\n"
         "Holati: " + ("✅ yoqilgan" if cfg["enabled"] else "❌ o'chirilgan") + "\n"
-        f"Har <b>{cfg['interval']}</b> daqiqada bitta reklama, yo'nalishlar navbatma-navbat "
-        "(guruhda yangi xabar bo'lsa)\n"
+        f"Har <b>{cfg['interval']}</b> daqiqada bitta reklama, yo'nalishlar navbatma-navbat, "
+        f"{activity}\n\n"
+        "<b>Guruhlar:</b>\n" + (escape("\n".join(groups)) if groups else "hali guruh yo'q") + "\n\n"
         f"Reklama orqali botga kelganlar: <b>{came}</b>\n\n"
         "Reklama faqat bot <b>admin</b> bo'lgan guruhlarga joylanadi. Har yo'nalishning "
         "yangisidan oldin eskisi o'chiriladi.\n\n"
@@ -192,14 +197,24 @@ async def _ads_status_text(db: Database) -> str:
 
 
 @router.callback_query(F.data == "adm:ads")
-async def ads_menu(cb: CallbackQuery, db: Database) -> None:
-    await cb.message.answer(await _ads_status_text(db))
+async def ads_menu(cb: CallbackQuery, db: Database, ads: AdService) -> None:
+    await cb.message.answer(await _ads_status_text(db, ads))
     await cb.answer()
 
 
 @router.message(Command("reklama"))
-async def ads_status(message: Message, db: Database) -> None:
-    await message.answer(await _ads_status_text(db))
+async def ads_status(message: Message, db: Database, ads: AdService) -> None:
+    await message.answer(await _ads_status_text(db, ads))
+
+
+@router.message(Command("reklama_faollik_on", "reklama_faollik_off"))
+async def ads_activity(message: Message, command: CommandObject, db: Database) -> None:
+    on = command.command == "reklama_faollik_on"
+    await db.set_setting(AD_ACTIVITY, "1" if on else "0")
+    await message.answer(
+        "✅ Reklama faqat guruhda yangi xabar bo'lganda joylanadi." if on else
+        "✅ Reklama endi guruhda yangi xabar bo'lmasa ham har safar joylanadi."
+    )
 
 
 @router.message(Command("reklama_on", "reklama_off"))

@@ -50,7 +50,7 @@ DEFAULT_INTERVAL_MIN = 10
 MIN_INTERVAL_MIN = 5
 
 # settings jadvalidagi kalitlar
-K_ENABLED, K_INTERVAL = "ad_enabled", "ad_interval_min"
+K_ENABLED, K_INTERVAL, K_ACTIVITY = "ad_enabled", "ad_interval_min", "ad_require_activity"
 
 
 def k_text(direction: str) -> str:
@@ -65,6 +65,8 @@ async def ad_settings(db: Database) -> dict:
     cfg = {
         "enabled": await db.get_setting(K_ENABLED, "1") == "1",
         "interval": int(await db.get_setting(K_INTERVAL, str(DEFAULT_INTERVAL_MIN))),
+        # Oxirgi reklamadan beri guruhda yangi xabar bo'lmasa, qayta joylamaslik
+        "require_activity": await db.get_setting(K_ACTIVITY, "1") == "1",
         "text": {},
         "button": {},
     }
@@ -72,6 +74,13 @@ async def ad_settings(db: Database) -> dict:
         cfg["text"][d] = await db.get_setting(k_text(d), DEFAULT_TEXTS[d])
         cfg["button"][d] = await db.get_setting(k_button(d), DEFAULT_BUTTONS[d])
     return cfg
+
+
+def _fmt_time(iso: str | None) -> str:
+    if not iso:
+        return "—"
+    from .regions import TZ
+    return datetime.fromisoformat(iso).astimezone(TZ).strftime("%d.%m %H:%M")
 
 
 def next_direction(last: str | None) -> str:
@@ -91,6 +100,25 @@ class AdService:
             log.info("get_chat_member %s: %s", chat_id, e)
             return False
         return member.status in ("administrator", "creator")
+
+    async def group_status(self) -> list[str]:
+        """Har bir guruh uchun reklama holati (admin panel uchun)."""
+        cfg = await ad_settings(self.db)
+        out = []
+        for g in await self.db.fetchall("SELECT * FROM groups WHERE active=1 ORDER BY title"):
+            admin = await self.is_admin_in(g["id"])
+            last = _fmt_time(g["last_ad_at"]) if g["ad_msg_f2t"] or g["ad_msg_t2f"] else "hali joylanmagan"
+            if not admin:
+                why = "❌ bot admin emas — reklama joylanmaydi"
+            elif cfg["require_activity"] and not g["msgs_since_ad"]:
+                why = "⏸ guruhda yangi xabar yo'q — kimdir yozgach joylanadi"
+            else:
+                why = "✅ navbatdagi reklama vaqti kelganda joylanadi"
+            out.append(
+                f"• {g['title'] or g['id']}\n  {why}\n"
+                f"  Oxirgi reklama: {last}; shundan beri xabarlar: {g['msgs_since_ad']}"
+            )
+        return out
 
     async def post(self, group, cfg: dict, direction: str) -> bool:
         """Bitta guruhga bitta yo'nalish reklamasini joylaydi. Muvaffaqiyatli bo'lsa True."""
@@ -129,7 +157,7 @@ class AdService:
             groups = await self.db.fetchall("SELECT * FROM groups WHERE active=1")
         else:
             before = (datetime.now(timezone.utc) - timedelta(minutes=cfg["interval"])).isoformat(timespec="seconds")
-            groups = await self.db.groups_due_for_ad(before)
+            groups = await self.db.groups_due_for_ad(before, cfg["require_activity"])
         n = 0
         for g in groups:
             directions = [TO_TASHKENT, FROM_TASHKENT] if force else [next_direction(g["last_ad_dir"])]

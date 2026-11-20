@@ -500,10 +500,11 @@ class Database:
     async def bump_group_activity(self, chat_id: int) -> None:
         await self.execute("UPDATE groups SET msgs_since_ad = msgs_since_ad + 1 WHERE id=?", chat_id)
 
-    async def groups_due_for_ad(self, before_iso: str):
-        """Faol, oxirgi reklamadan beri yangi xabar bo'lgan va vaqti kelgan guruhlar."""
+    async def groups_due_for_ad(self, before_iso: str, require_activity: bool = True):
+        """Faol va vaqti kelgan guruhlar (require_activity — oxirgi reklamadan beri yangi xabar bo'lgan)."""
+        activity = "AND msgs_since_ad > 0" if require_activity else ""
         return await self.fetchall(
-            """SELECT * FROM groups WHERE active=1 AND msgs_since_ad > 0
+            f"""SELECT * FROM groups WHERE active=1 {activity}
                AND (last_ad_at IS NULL OR last_ad_at <= ?)""",
             before_iso,
         )
