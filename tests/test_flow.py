@@ -5,12 +5,13 @@ from datetime import datetime, timedelta
 import pytest
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.methods import SendMessage, TelegramMethod
+from aiogram.methods import CopyMessage, SendMessage, TelegramMethod
 from aiogram.types import CallbackQuery, Chat, Contact, Location, Message, Update, User
 
 from bot.config import Config
 from bot.db import Database
 from bot.handlers import setup_routers
+from bot.middlewares import BanMiddleware
 from bot.regions import today
 from bot.service import MatchService
 
@@ -45,13 +46,19 @@ async def app(tmp_path):
     db = Database(str(tmp_path / "f.db"))
     await db.connect()
     bot = RecBot()
-    cfg = Config(bot_token="42:TEST", db_path="", offer_timeout_min=5, admin_ids=())
+    cfg = Config(bot_token="42:TEST", db_path="", offer_timeout_min=5, admin_ids=(900,))
     svc = MatchService(bot, db, cfg)
     dp = Dispatcher(storage=MemoryStorage())
-    dp["db"], dp["svc"] = db, svc
+    dp["db"], dp["svc"], dp["config"] = db, svc, cfg
+    dp.message.outer_middleware(BanMiddleware())
+    dp.callback_query.outer_middleware(BanMiddleware())
     dp.include_router(setup_routers())
     yield bot, dp, db
     await db.close()
+    # Modul darajasidagi routerlarni keyingi test uchun ajratamiz
+    from bot.handlers import admin, common, driver, offers, passenger
+    for m in (admin, common, driver, offers, passenger):
+        m.router._parent_router = None
 
 
 def _user(uid):
@@ -125,3 +132,38 @@ async def test_full_flow(app):
     await send(bot, dp, D, "📋 Mening e'lonlarim")
     await click(bot, dp, D, f"tm:pax:{trip['id']}")
     assert any("yukim bor" in t for t in bot.texts_to(D))
+
+
+async def test_admin_panel(app):
+    bot, dp, db = app
+    ADMIN, U1, U2 = 900, 701, 702
+    for uid in (ADMIN, U1, U2):
+        await send(bot, dp, uid, "/start")
+
+    # Oddiy foydalanuvchi admin panelni ko'rmaydi
+    n = len(bot.texts_to(U1))
+    await send(bot, dp, U1, "/admin")
+    assert len(bot.texts_to(U1)) == n
+
+    await send(bot, dp, ADMIN, "/admin")
+    assert any("Admin panel" in t for t in bot.texts_to(ADMIN))
+    await click(bot, dp, ADMIN, "adm:stats")
+    assert any("Foydalanuvchilar: <b>3</b>" in t for t in bot.texts_to(ADMIN))
+
+    # Xabar tarqatish
+    await click(bot, dp, ADMIN, "adm:bc")
+    await send(bot, dp, ADMIN, "Yangilik!")
+    await click(bot, dp, ADMIN, "adm:bc_ok")
+    copied = {m.chat_id for m in bot.calls if isinstance(m, CopyMessage)}
+    assert copied == {ADMIN, U1, U2}
+
+    # Bloklash
+    await send(bot, dp, ADMIN, f"/ban {U2}")
+    assert await db.is_banned(U2)
+    await send(bot, dp, U2, "🧍 Yo'lovchiman")
+    assert "bloklangansiz" in bot.texts_to(U2)[-1]
+    await send(bot, dp, ADMIN, f"/unban {U2}")
+    assert not await db.is_banned(U2)
+
+    await send(bot, dp, U1, "/id")
+    assert str(U1) in bot.texts_to(U1)[-1]

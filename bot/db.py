@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS users (
     full_name   TEXT,
     username    TEXT,
     phone       TEXT,
+    banned      INTEGER NOT NULL DEFAULT 0,
     created_at  TEXT NOT NULL
 );
 
@@ -83,6 +84,10 @@ class Database:
         self.conn.row_factory = aiosqlite.Row
         await self.conn.execute("PRAGMA foreign_keys = ON")
         await self.conn.executescript(SCHEMA)
+        # Eski bazalar uchun: yangi ustunlarni qo'shamiz
+        cols = {r["name"] for r in await self.fetchall("PRAGMA table_info(users)")}
+        if "banned" not in cols:
+            await self.conn.execute("ALTER TABLE users ADD COLUMN banned INTEGER NOT NULL DEFAULT 0")
         await self.conn.commit()
 
     async def close(self) -> None:
@@ -320,3 +325,63 @@ class Database:
         )
         await self.conn.commit()
         return expired
+
+    # --- admin ---------------------------------------------------------------
+    async def is_banned(self, uid: int) -> bool:
+        row = await self.fetchone("SELECT banned FROM users WHERE id=?", uid)
+        return bool(row and row["banned"])
+
+    async def set_banned(self, uid: int, banned: bool) -> bool:
+        n = await self._exec_count("UPDATE users SET banned=? WHERE id=?", int(banned), uid)
+        return n == 1
+
+    async def all_user_ids(self) -> list[int]:
+        rows = await self.fetchall("SELECT id FROM users WHERE banned=0")
+        return [r["id"] for r in rows]
+
+    async def stats(self, today_iso: str) -> dict[str, int]:
+        q = {
+            "users": "SELECT COUNT(*) FROM users",
+            "banned": "SELECT COUNT(*) FROM users WHERE banned=1",
+            "drivers": "SELECT COUNT(DISTINCT driver_id) FROM trips",
+            "passengers": "SELECT COUNT(DISTINCT passenger_id) FROM requests",
+            "active_trips": "SELECT COUNT(*) FROM trips WHERE status='active'",
+            "searching": "SELECT COUNT(*) FROM requests WHERE status='searching'",
+            "matched_total": "SELECT COUNT(*) FROM offers WHERE status='accepted'",
+            "requests_today": "SELECT COUNT(*) FROM requests WHERE substr(created_at,1,10)=?",
+            "trips_today": "SELECT COUNT(*) FROM trips WHERE substr(created_at,1,10)=?",
+            "matched_today": "SELECT COUNT(*) FROM offers WHERE status='accepted'"
+                             " AND substr(created_at,1,10)=?",
+        }
+        out = {}
+        for k, sql in q.items():
+            args = (today_iso,) if "?" in sql else ()
+            row = await self.fetchone(sql, *args)
+            out[k] = row[0]
+        return out
+
+    async def all_active_trips(self, limit: int = 30):
+        return await self.fetchall(
+            """SELECT t.*, u.full_name, u.username, u.phone FROM trips t
+               JOIN users u ON u.id=t.driver_id
+               WHERE t.status='active' ORDER BY t.trip_date, t.id LIMIT ?""",
+            limit,
+        )
+
+    async def all_searching_requests(self, limit: int = 30):
+        return await self.fetchall(
+            """SELECT r.*, u.full_name, u.username, u.phone FROM requests r
+               JOIN users u ON u.id=r.passenger_id
+               WHERE r.status='searching' ORDER BY r.trip_date, r.id LIMIT ?""",
+            limit,
+        )
+
+    async def find_users(self, query: str, limit: int = 10):
+        q = query.strip().lstrip("@")
+        if q.isdigit():
+            return await self.fetchall("SELECT * FROM users WHERE id=?", int(q))
+        like = f"%{q}%"
+        return await self.fetchall(
+            "SELECT * FROM users WHERE username LIKE ? OR full_name LIKE ? OR phone LIKE ? LIMIT ?",
+            like, like, like, limit,
+        )

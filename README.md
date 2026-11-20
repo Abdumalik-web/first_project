@@ -50,6 +50,18 @@ python -m bot.main
 | `BOT_TOKEN` | BotFather tokeni | — (majburiy) |
 | `DB_PATH` | SQLite fayli | `taxi.db` |
 | `OFFER_TIMEOUT_MIN` | Haydovchi javob berishi uchun daqiqa | `5` |
+| `ADMIN_IDS` | Adminlar Telegram ID raqamlari, vergul bilan (`111,222`) | bo'sh |
+
+## Admin panel
+
+1. Botga `/id` yozing — sizning Telegram ID raqamingiz chiqadi.
+2. `.env` faylga `ADMIN_IDS=123456789` deb yozing (bir nechta bo'lsa vergul bilan) va botni qayta ishga tushiring.
+3. Botga `/admin` yozing:
+   - 📊 **Statistika** — foydalanuvchilar, haydovchilar, yo'lovchilar, faol e'lonlar, moslashuvlar;
+   - 🚗 **Faol e'lonlar** va 🧍 **Kutayotgan so'rovlar** ro'yxati (telefon va ID bilan);
+   - 📢 **Hammaga xabar yuborish** — matn, rasm yoki video.
+4. Buyruqlar: `/user <id | @username | ism | telefon>`, `/ban <id>`, `/unban <id>`,
+   `/del_trip <raqam>`, `/del_req <raqam>`.
 
 ## Testlar
 
@@ -69,7 +81,8 @@ bot/
   service.py     # so'rovni haydovchiga yuborish, qabul/rad, taymaut
   db.py          # SQLite (aiosqlite)
   keyboards.py, texts.py
-  handlers/      # common, driver, passenger, offers
+  middlewares.py # bloklangan foydalanuvchilarni to'xtatish
+  handlers/      # common, admin, driver, passenger, offers
 tests/           # matching, service va to'liq oqim testlari
 ```
 

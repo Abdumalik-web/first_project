@@ -40,6 +40,11 @@ async def help_(message: Message) -> None:
     await message.answer(texts.HELP, reply_markup=main_menu())
 
 
+@router.message(Command("id"))
+async def my_id(message: Message) -> None:
+    await message.answer(f"Sizning Telegram ID raqamingiz: <code>{message.from_user.id}</code>")
+
+
 @router.message(Command("cancel"))
 @router.message(F.text == BTN_CANCEL)
 async def cancel(message: Message, state: FSMContext) -> None:
