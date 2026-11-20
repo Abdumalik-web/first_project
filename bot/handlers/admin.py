@@ -75,7 +75,8 @@ ADMIN_HELP = (
     "/del_trip <i>raqam</i> — e'lonni o'chirish\n"
     "/del_req <i>raqam</i> — so'rovni o'chirish\n"
     "/tekshir <i>matn</i> — guruh xabarini bot qanday tushunishini ko'rish\n"
-    "/reklama — guruh reklamasi, /elon — haydovchi e'lonlarini guruhlarga joylash"
+    "/reklama — guruh reklamasi, /elon — haydovchi e'lonlarini guruhlarga joylash\n"
+    "/guruh_link — haydovchi va yo'lovchilarga bir marta yuboriladigan guruh havolasi"
 )
 
 
@@ -295,6 +296,31 @@ async def trips_now(message: Message, ads: AdService) -> None:
         "Hech narsa joylanmadi: bo'sh joyi bor faol e'lon yo'q yoki bot hech bir guruhda admin emas "
         "(/reklama da guruhlar holatini ko'ring)."
     )
+
+
+@router.message(Command("guruh_link"))
+async def group_link(message: Message, command: CommandObject, db: Database) -> None:
+    arg = (command.args or "").strip()
+    if not arg:
+        link = await db.get_setting(texts.GROUP_LINK_KEY, texts.DEFAULT_GROUP_LINK)
+        await message.answer(
+            "👥 Guruh havolasi: " + (escape(link) or "yo'q") + "\n\n"
+            "Bu havola har bir haydovchiga (e'loni guruhga birinchi joylanganda) va har bir "
+            "yo'lovchiga (birinchi so'rovidan keyin) <b>bir marta</b> yuboriladi.\n\n"
+            "O'zgartirish: <code>/guruh_link https://t.me/...</code>\n"
+            "O'chirish: <code>/guruh_link off</code>",
+            disable_web_page_preview=True,
+        )
+        return
+    if arg.lower() == "off":
+        await db.set_setting(texts.GROUP_LINK_KEY, "")
+        await message.answer("❌ Guruh havolasi yuborilmaydi.")
+        return
+    if not arg.startswith("https://t.me/") or " " in arg:
+        await message.answer("Havola https://t.me/ bilan boshlanishi kerak.")
+        return
+    await db.set_setting(texts.GROUP_LINK_KEY, arg)
+    await message.answer(f"✅ Saqlandi: {escape(arg)}", disable_web_page_preview=True)
 
 
 @router.message(Command("reklama_hozir"))

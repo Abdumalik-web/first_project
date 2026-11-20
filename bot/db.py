@@ -123,6 +123,7 @@ class Database:
         # Eski bazalar uchun: yangi ustunlarni qo'shamiz
         await self._ensure_column("users", "banned", "INTEGER NOT NULL DEFAULT 0")
         await self._ensure_column("users", "source", "TEXT")
+        await self._ensure_column("users", "link_notified", "INTEGER NOT NULL DEFAULT 0")
         await self._ensure_column("groups", "last_ad_msg_id", "INTEGER")
         await self._ensure_column("groups", "last_ad_at", "TEXT")
         await self._ensure_column("groups", "msgs_since_ad", "INTEGER NOT NULL DEFAULT 1")
@@ -587,5 +588,12 @@ class Database:
         """Haydovchiga «guruhga joylandi» xabari hali yuborilmagan bo'lsa True qaytaradi va belgilaydi."""
         n = await self._exec_count(
             "UPDATE trips SET publish_notified=1 WHERE id=? AND publish_notified=0", trip_id
+        )
+        return n == 1
+
+    async def mark_user_link_notified(self, uid: int) -> bool:
+        """Guruh havolasi hali yuborilmagan bo'lsa True qaytaradi va belgilaydi (har odamga bir marta)."""
+        n = await self._exec_count(
+            "UPDATE users SET link_notified=1 WHERE id=? AND link_notified=0", uid
         )
         return n == 1

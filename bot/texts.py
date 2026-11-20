@@ -109,3 +109,26 @@ def trip_post_text(t: Mapping[str, Any]) -> str:
         account += f" — @{escape(t['username'])}"
     lines.append(f"👤 {account}")
     return "\n".join(lines)
+
+
+DEFAULT_GROUP_LINK = "https://t.me/toshken_fargonaa_taksi"
+GROUP_LINK_KEY = "group_link"
+
+
+def driver_link_text(trip_id: int, link: str) -> str:
+    return (
+        f"✅ Yuborgan e'loningiz #{trip_id} guruhlarimizga joylandi!\n\n"
+        f"👥 Guruhimiz: {link}\n"
+        "Qo'shiling — u yerda yo'lovchilar va sheriklar topishingiz mumkin.\n\n"
+        "E'lon har soatda yangilanadi, joylar to'lsa yoki e'lon yopilsa guruhdan o'chiriladi. "
+        "Guruhda ko'rinmasin desangiz: «📋 Mening e'lonlarim» ➜ «📢 Guruhlarga joylash»."
+    )
+
+
+def passenger_link_text(link: str) -> str:
+    return (
+        "👥 Guruhimizga qo'shiling!\n\n"
+        "U yerda har kuni Farg'onadan Toshkentga va Toshkentdan Farg'onaga yuradigan "
+        "haydovchilar e'lonlari chiqadi — o'zingizga haydovchi va sheriklar topishingiz mumkin.\n\n"
+        f"👉 {link}"
+    )

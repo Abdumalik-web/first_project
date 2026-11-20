@@ -147,6 +147,11 @@ yo'nalish (tumanlar ➜ Toshkent yoki aksincha), sana va vaqt, bo'sh joylar, mas
 - Haydovchi «📋 Mening e'lonlarim» ➜ «📢 Guruhlarga joylash» bilan istalgan payt yoqib-o'chiradi.
 - Admin: `/elon` (holati), `/elon_on`, `/elon_off`, `/elon_vaqt 60`, `/elon_hozir`.
 
+**Guruh havolasi.** Har bir haydovchiga (e'loni guruhga birinchi joylanganda: *«Yuborgan
+e'loningiz guruhlarimizga joylandi»*) va har bir yo'lovchiga (birinchi so'rovidan keyin)
+guruh havolasi **faqat bir marta** yuboriladi. Havolani almashtirish: `/guruh_link https://t.me/...`,
+o'chirish: `/guruh_link off`.
+
 ## Ovozli xabar orqali e'lon
 
 Foydalanuvchi botga ovozli xabar yuborishi mumkin, masalan: *«Ertaga ertalab Qo'qondan

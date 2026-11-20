@@ -267,3 +267,7 @@ async def confirm(cb: CallbackQuery, state: FSMContext, db: Database, svc: Match
             "telefon raqamini sizga yuboramiz.",
             reply_markup=request_manage_kb(req_id),
         )
+    # Guruh havolasi — har bir yo'lovchiga faqat bir marta
+    link = await db.get_setting(texts.GROUP_LINK_KEY, texts.DEFAULT_GROUP_LINK)
+    if link and await db.mark_user_link_notified(cb.from_user.id):
+        await cb.message.answer(texts.passenger_link_text(link), disable_web_page_preview=True)

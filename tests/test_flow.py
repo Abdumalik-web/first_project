@@ -127,6 +127,7 @@ async def test_full_flow(app):
     await send(bot, dp, PAX, "yukim bor")
     await send(bot, dp, PAX, "+998 90 444 55 66")
     await click(bot, dp, PAX, "ps:ok")
+    assert sum("Guruhimizga qo'shiling" in t for t in bot.texts_to(PAX)) == 1
 
     assert any("Yangi yo'lovchi" in t for t in bot.texts_to(D))
     kb = bot.last_kb(D)
@@ -138,6 +139,15 @@ async def test_full_flow(app):
     assert any("+998904445566" in t for t in bot.texts_to(D))
     trip = await db.get_trip(trips[0]["id"])
     assert trip["seats_free"] == 2
+
+    # Ikkinchi so'rovda havola qayta yuborilmaydi
+    await send(bot, dp, PAX, "🧍 Yo'lovchiman")
+    for d in ("ps:dir:T2F", "ps:fd:quva", "ps:td:yunusobod", f"ps:date:{day}", "ps:slot:day", "ps:seats:1"):
+        await click(bot, dp, PAX, d)
+    await send(bot, dp, PAX, "⏭ O'tkazib yuborish")
+    await send(bot, dp, PAX, "⏭ O'tkazib yuborish")
+    await click(bot, dp, PAX, "ps:ok")
+    assert sum("Guruhimizga qo'shiling" in t for t in bot.texts_to(PAX)) == 1
 
     # --- "Mening e'lonlarim" va yo'lovchilar ro'yxati
     await send(bot, dp, D, "📋 Mening e'lonlarim")
@@ -183,6 +193,12 @@ async def test_admin_panel(app):
     await send(bot, dp, ADMIN, "/reklama_matn2 Yangi reklama matni")
     await click(bot, dp, ADMIN, "adm:ads")
     assert "Yangi reklama matni" in bot.texts_to(ADMIN)[-1] and "Har <b>30</b>" in bot.texts_to(ADMIN)[-1]
+
+    await send(bot, dp, ADMIN, "/guruh_link")
+    assert "toshken_fargonaa_taksi" in bot.texts_to(ADMIN)[-1]
+    await send(bot, dp, ADMIN, "/guruh_link https://t.me/yangi_guruh")
+    assert await db.get_setting("group_link", "") == "https://t.me/yangi_guruh"
+    await send(bot, dp, ADMIN, "/guruh_link https://t.me/toshken_fargonaa_taksi")
 
     await send(bot, dp, ADMIN, "/tekshir Ertaga Qo'qondan Toshkentga 2 kishi kerak")
     assert "tanildi" in bot.texts_to(ADMIN)[-1]
@@ -427,8 +443,9 @@ async def test_driver_trips_posted_to_admin_groups(app):
 
     assert await ads.tick_trips() == 1  # o'chirib qo'ygan haydovchi joylanmaydi
     txt = posts()[-1].text
-    # Haydovchiga bir martalik xabar
-    assert any("guruhlarga joylandi" in x for x in bot.texts_to(D_YES))
+    # Haydovchiga bir martalik xabar: e'lon joylandi + guruh havolasi
+    assert any("guruhlarimizga joylandi" in x and "t.me/toshken_fargonaa_taksi" in x
+               for x in bot.texts_to(D_YES))
     assert "Toshkent ➜ Qo'qon, Dang'ara" in txt and "+998900000981" in txt and "@user981" in txt
     assert "Cobalt oq" in txt and "150 000" in txt and "Bo'sh joy: <b>3</b>" in txt
     assert "+998900000982" not in txt
@@ -440,7 +457,11 @@ async def test_driver_trips_posted_to_admin_groups(app):
     first_msg = (await db.get_trip_post(t_yes, G))["message_id"]
     assert await ads.tick_trips() == 1
     assert any(isinstance(m, DeleteMessage) and m.message_id == first_msg for m in bot.calls)
-    assert sum("guruhlarga joylandi" in x for x in bot.texts_to(D_YES)) == 1  # takrorlanmaydi
+    assert sum("guruhlarimizga joylandi" in x for x in bot.texts_to(D_YES)) == 1  # takrorlanmaydi
+    # Shu haydovchining ikkinchi e'loni ham — havola qayta yuborilmaydi
+    await db.create_trip(D_YES, "F2T", ["quva"], tomorrow, "morning", 2, None, None, None, None, publish=True)
+    await ads.tick_trips()
+    assert sum("guruhlarimizga joylandi" in x for x in bot.texts_to(D_YES)) == 1
 
     # Joylar to'lsa — guruhdan o'chiriladi va boshqa joylanmaydi
     await db.execute("UPDATE trips SET seats_free=0 WHERE id=?", t_yes)
@@ -454,7 +475,7 @@ async def test_driver_trips_posted_to_admin_groups(app):
     assert "Haydovchi e'lonlarini" in bot.texts_to(900)[-1]
     await db.execute("UPDATE trips SET seats_free=2 WHERE id=?", t_yes)
     await send(bot, dp, 900, "/elon_hozir")
-    assert "1 ta e'lon" in bot.texts_to(900)[-1]
+    assert "ta e'lon guruhlarga joylandi" in bot.texts_to(900)[-1]
 
     # Haydovchi "Mening e'lonlarim"dan o'chirib-yoqishi mumkin
     await db.execute("UPDATE trips SET seats_free=2 WHERE id=?", t_yes)
