@@ -63,7 +63,10 @@ python -m bot.main
    - 📊 **Statistika** — foydalanuvchilar, haydovchilar, yo'lovchilar, faol e'lonlar, moslashuvlar;
    - 🚗 **Faol e'lonlar** va 🧍 **Kutayotgan so'rovlar** ro'yxati (telefon va ID bilan);
    - 📢 **Hammaga xabar yuborish** — matn, rasm yoki video.
-4. Buyruqlar: `/user <id | @username | ism | telefon>`, `/ban <id>`, `/unban <id>`,
+4. **👤 Foydalanuvchilar** (yoki `/users`): botdan foydalanuvchilar ro'yxati — ism, username,
+   telefon, nechta e'lon/so'rov bergani, qachon qo'shilgani; filtr (haydovchilar, yo'lovchilar,
+   bloklanganlar), sahifalash va **Excel'da ochiladigan fayl** (CSV) qilib yuklab olish.
+5. Buyruqlar: `/user <id | @username | ism | telefon>`, `/ban <id>`, `/unban <id>`,
    `/del_trip <raqam>`, `/del_req <raqam>`.
 
 ## Testlar

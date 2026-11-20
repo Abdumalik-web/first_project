@@ -14,6 +14,7 @@ from aiogram.filters import Command, CommandObject, Filter
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import (
+    BufferedInputFile,
     CallbackQuery,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
@@ -54,7 +55,8 @@ def admin_kb() -> InlineKeyboardMarkup:
     b = InlineKeyboardButton
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [b(text="📊 Statistika", callback_data="adm:stats")],
+            [b(text="📊 Statistika", callback_data="adm:stats"),
+             b(text="👤 Foydalanuvchilar", callback_data="usr:all:0")],
             [b(text="🚗 Faol e'lonlar", callback_data="adm:trips"),
              b(text="🧍 Kutayotgan so'rovlar", callback_data="adm:reqs")],
             [b(text="👥 Guruhlar", callback_data="adm:groups"),
@@ -69,6 +71,7 @@ ADMIN_HELP = (
     "🛠 <b>Admin panel</b>\n\n"
     "Buyruqlar:\n"
     "/admin — shu menyu\n"
+    "/users — foydalanuvchilar ro'yxati (Excel faylga yuklab olish ham bor)\n"
     "/user <i>id, @username, ism yoki telefon</i> — foydalanuvchini qidirish\n"
     "/ban <i>id</i> — bloklash (faol e'lon va so'rovlari bekor qilinadi)\n"
     "/unban <i>id</i> — blokdan chiqarish\n"
@@ -386,6 +389,110 @@ async def check_text(message: Message, command: CommandObject, db: Database) -> 
             "to'g'ri keladimi, bo'sh o'rni yetarlimi — tekshiring."
         )
     await message.answer("\n".join(lines))
+
+
+# --- foydalanuvchilar ro'yxati -------------------------------------------------
+USERS_PER_PAGE = 15
+USER_FILTERS = {"all": "Hammasi", "drv": "🚗 Haydovchilar", "pax": "🧍 Yo'lovchilar", "ban": "🚫 Bloklangan"}
+
+
+def _user_line(u) -> str:
+    name = escape(u["full_name"] or "—")
+    link = f'<a href="tg://user?id={u["id"]}">{name}</a>'
+    parts = [link]
+    if u["username"]:
+        parts.append(f"@{escape(u['username'])}")
+    if u["phone"]:
+        parts.append(escape(u["phone"]))
+    roles = []
+    if u["trips_n"]:
+        roles.append(f"🚗 {u['trips_n']} e'lon")
+    if u["reqs_n"]:
+        roles.append(f"🧍 {u['reqs_n']} so'rov")
+    extra = [", ".join(roles) or "hali e'lon/so'rov yo'q",
+             f"id <code>{u['id']}</code>", (u["created_at"] or "")[:10]]
+    if u["source"] and u["source"].startswith("g"):
+        extra.append("reklamadan")
+    if u["banned"]:
+        extra.append("🚫 bloklangan")
+    return " · ".join(parts) + "\n   " + " · ".join(extra)
+
+
+def _users_kb(flt: str, page: int, pages: int) -> InlineKeyboardMarkup:
+    b = InlineKeyboardButton
+    rows = [[b(text=("• " if k == flt else "") + v, callback_data=f"usr:{k}:0")
+             for k, v in list(USER_FILTERS.items())[:2]],
+            [b(text=("• " if k == flt else "") + v, callback_data=f"usr:{k}:0")
+             for k, v in list(USER_FILTERS.items())[2:]]]
+    nav = []
+    if page > 0:
+        nav.append(b(text="⬅️ Oldingi", callback_data=f"usr:{flt}:{page - 1}"))
+    if page + 1 < pages:
+        nav.append(b(text="Keyingi ➡️", callback_data=f"usr:{flt}:{page + 1}"))
+    if nav:
+        rows.append(nav)
+    rows.append([b(text="📥 Hammasini faylda yuklab olish (Excel)", callback_data="usr_csv")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+@router.callback_query(F.data.startswith("usr:"))
+async def users_page(cb: CallbackQuery, db: Database) -> None:
+    _, flt, sp = cb.data.split(":")
+    page = max(0, int(sp))
+    total = await db.count_users(flt)
+    pages = max(1, (total + USERS_PER_PAGE - 1) // USERS_PER_PAGE)
+    page = min(page, pages - 1)
+    users = await db.list_users(flt, USERS_PER_PAGE, page * USERS_PER_PAGE)
+    head = (f"👤 <b>Foydalanuvchilar — {USER_FILTERS.get(flt, '')}</b>: {total} ta"
+            f" (sahifa {page + 1}/{pages})\n"
+            "Ismga bossangiz — profili ochiladi. Batafsil: <code>/user id</code>\n")
+    lines = [f"{page * USERS_PER_PAGE + i + 1}. {_user_line(u)}" for i, u in enumerate(users)]
+    text = head + "\n" + ("\n\n".join(lines) if lines else "Hech kim yo'q.")
+    kb = _users_kb(flt, page, pages)
+    try:
+        if cb.message.text and cb.message.text.startswith("👤 Foydalanuvchilar"):
+            await cb.message.edit_text(text, reply_markup=kb, disable_web_page_preview=True)
+        else:
+            await cb.message.answer(text, reply_markup=kb, disable_web_page_preview=True)
+    except TelegramAPIError:
+        await cb.message.answer(text, reply_markup=kb, disable_web_page_preview=True)
+    await cb.answer()
+
+
+@router.callback_query(F.data == "usr_csv")
+async def users_csv(cb: CallbackQuery, db: Database) -> None:
+    import csv
+    import io
+    buf = io.StringIO()
+    w = csv.writer(buf, delimiter=";")  # Excel (ruscha/o'zbekcha sozlama) uchun ";"
+    w.writerow(["ID", "Ism", "Username", "Telefon", "E'lonlar (haydovchi)", "So'rovlar (yo'lovchi)",
+                "Ro'yxatdan o'tgan", "Manba", "Bloklangan"])
+    total = await db.count_users("all")
+    for off in range(0, total, 500):
+        for u in await db.list_users("all", 500, off):
+            w.writerow([u["id"], u["full_name"] or "", f"@{u['username']}" if u["username"] else "",
+                        u["phone"] or "", u["trips_n"], u["reqs_n"], (u["created_at"] or "")[:19],
+                        "reklama" if (u["source"] or "").startswith("g") else "",
+                        "ha" if u["banned"] else ""])
+    data = ("\ufeff" + buf.getvalue()).encode("utf-8")  # BOM — Excel o'zbek harflarini to'g'ri ko'rsatishi uchun
+    name = f"foydalanuvchilar_{datetime.now(timezone.utc):%Y-%m-%d}.csv"
+    await cb.message.answer_document(BufferedInputFile(data, filename=name),
+                                     caption=f"👤 {total} ta foydalanuvchi")
+    await cb.answer()
+
+
+@router.message(Command("users"))
+async def users_cmd(message: Message, db: Database) -> None:
+    total = await db.count_users("all")
+    users = await db.list_users("all", USERS_PER_PAGE, 0)
+    pages = max(1, (total + USERS_PER_PAGE - 1) // USERS_PER_PAGE)
+    lines = [f"{i + 1}. {_user_line(u)}" for i, u in enumerate(users)]
+    await message.answer(
+        f"👤 <b>Foydalanuvchilar — Hammasi</b>: {total} ta (sahifa 1/{pages})\n"
+        "Ismga bossangiz — profili ochiladi. Batafsil: <code>/user id</code>\n\n"
+        + ("\n\n".join(lines) if lines else "Hech kim yo'q."),
+        reply_markup=_users_kb("all", 0, pages), disable_web_page_preview=True,
+    )
 
 
 # --- foydalanuvchilar ---------------------------------------------------------

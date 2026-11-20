@@ -482,3 +482,42 @@ async def test_driver_trips_posted_to_admin_groups(app):
     await click(bot, dp, D_YES, f"tm:pub:{t_yes}")
     assert (await db.get_trip(t_yes))["publish"] == 0
     assert await ads.tick_trips() == 0
+
+
+
+async def test_admin_users_list(app):
+    from aiogram.methods import EditMessageText, SendDocument
+    bot, dp, db = app
+    ADMIN = 900
+    await send(bot, dp, ADMIN, "/start")
+    for i in range(20):
+        await db.upsert_user(5000 + i, f"Odam {i}", f"odam{i}" if i % 2 else None)
+    await db.set_phone(5001, "+998901112233")
+    tomorrow = (today() + timedelta(days=1)).isoformat()
+    await db.create_trip(5001, "F2T", ["qoqon"], tomorrow, "morning", 3, None, None, None, None)
+    await db.create_request(5002, "F2T", "qoqon", "chilonzor", None, None, tomorrow, "morning", 1, None)
+    await db.set_banned(5003, True)
+
+    # Oddiy foydalanuvchi ro'yxatni ko'ra olmaydi
+    n = len(bot.texts_to(5004))
+    await send(bot, dp, 5004, "/users")
+    assert len(bot.texts_to(5004)) == n
+
+    await send(bot, dp, ADMIN, "/users")
+    out = bot.texts_to(ADMIN)[-1]
+    assert "21 ta" in out and "sahifa 1/2" in out  # 20 + admin
+    await click(bot, dp, ADMIN, "usr:all:1")
+    await click(bot, dp, ADMIN, "usr:drv:0")
+    await click(bot, dp, ADMIN, "usr:pax:0")
+    await click(bot, dp, ADMIN, "usr:ban:0")
+    shown = [m.text for m in bot.calls if isinstance(m, (SendMessage, EditMessageText)) and m.chat_id == ADMIN]
+    drv = next(t for t in shown if "Haydovchilar</b>: 1 ta" in t)
+    assert "Odam 1" in drv and "+998901112233" in drv and "1 e'lon" in drv
+    assert any("Yo'lovchilar</b>: 1 ta" in t and "Odam 2" in t for t in shown)
+    assert any("Bloklangan</b>: 1 ta" in t and "Odam 3" in t for t in shown)
+
+    await click(bot, dp, ADMIN, "usr_csv")
+    doc = next(m for m in bot.calls if isinstance(m, SendDocument))
+    content = doc.document.data.decode("utf-8-sig")
+    assert content.count("\n") == 22  # sarlavha + 21 qator
+    assert "Odam 1;@odam1;+998901112233;1;0" in content

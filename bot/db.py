@@ -597,3 +597,27 @@ class Database:
             "UPDATE users SET link_notified=1 WHERE id=? AND link_notified=0", uid
         )
         return n == 1
+
+    # --- foydalanuvchilar ro'yxati (admin) -------------------------------------
+    _USER_FILTERS = {
+        "all": "1=1",
+        "drv": "EXISTS (SELECT 1 FROM trips t WHERE t.driver_id=u.id)",
+        "pax": "EXISTS (SELECT 1 FROM requests r WHERE r.passenger_id=u.id)",
+        "ban": "u.banned=1",
+    }
+
+    async def list_users(self, flt: str = "all", limit: int = 15, offset: int = 0):
+        where = self._USER_FILTERS.get(flt, "1=1")
+        return await self.fetchall(
+            f"""SELECT u.*,
+                   (SELECT COUNT(*) FROM trips t WHERE t.driver_id=u.id) AS trips_n,
+                   (SELECT COUNT(*) FROM requests r WHERE r.passenger_id=u.id) AS reqs_n
+               FROM users u WHERE {where}
+               ORDER BY u.created_at DESC LIMIT ? OFFSET ?""",
+            limit, offset,
+        )
+
+    async def count_users(self, flt: str = "all") -> int:
+        where = self._USER_FILTERS.get(flt, "1=1")
+        row = await self.fetchone(f"SELECT COUNT(*) FROM users u WHERE {where}")
+        return row[0]
