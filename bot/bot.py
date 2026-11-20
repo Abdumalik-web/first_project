@@ -4,12 +4,13 @@ O'chiradi:
   - Telegram guruh/kanal havolalari (t.me, telegram.me, @username)
   - Instagram, YouTube, TikTok va boshqa havolalar
   - Kanallardan forward qilingan xabarlar
-  - (ixtiyoriy) video xabarlar
+  - (ixtiyoriy) rasm va video xabarlar  (adminlar: /rasm, /video, /sozlamalar)
 
 Adminlar xabarlari tegilmaydi.
 """
 
 import asyncio
+import json
 import logging
 import os
 import re
@@ -27,6 +28,10 @@ BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 BLOCK_ALL_LINKS = os.getenv("BLOCK_ALL_LINKS", "1") == "1"
 # "1" bo'lsa oddiy a'zolar yuborgan videolar ham o'chiriladi
 DELETE_VIDEOS = os.getenv("DELETE_VIDEOS", "0") == "1"
+# "1" bo'lsa oddiy a'zolar yuborgan rasmlar ham o'chiriladi
+DELETE_PHOTOS = os.getenv("DELETE_PHOTOS", "0") == "1"
+# Guruhlar sozlamalari saqlanadigan fayl
+SETTINGS_FILE = os.getenv("SETTINGS_FILE", os.path.join(os.path.dirname(os.path.abspath(__file__)), "settings.json"))
 # Ogohlantirish xabari necha soniyadan keyin o'chsin
 WARN_TTL = int(os.getenv("WARN_TTL", "10"))
 
@@ -46,6 +51,31 @@ URL_RE = re.compile(
 dp = Dispatcher()
 
 
+def _load_settings() -> dict:
+    try:
+        with open(SETTINGS_FILE, encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {}
+
+
+_settings: dict = _load_settings()
+
+
+def chat_setting(chat_id: int, key: str) -> bool:
+    defaults = {"photos": DELETE_PHOTOS, "videos": DELETE_VIDEOS}
+    return _settings.get(str(chat_id), {}).get(key, defaults[key])
+
+
+def set_chat_setting(chat_id: int, key: str, value: bool) -> None:
+    _settings.setdefault(str(chat_id), {})[key] = value
+    try:
+        with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
+            json.dump(_settings, f, indent=2)
+    except OSError as e:
+        logging.warning("Sozlamani saqlab bo'lmadi: %s", e)
+
+
 def _is_blocked_url(url: str) -> bool:
     if BLOCK_ALL_LINKS:
         return True
@@ -53,14 +83,16 @@ def _is_blocked_url(url: str) -> bool:
     return any(d in u for d in BLOCKED_DOMAINS)
 
 
-def find_violation(msg: Message) -> str | None:
+def find_violation(msg: Message, delete_photos: bool = False, delete_videos: bool = False) -> str | None:
     """Xabarda reklama bo'lsa, sababini qaytaradi."""
     # Kanaldan / boshqa chatdan forward
     if msg.forward_origin is not None:
         return "forward"
 
-    if DELETE_VIDEOS and (msg.video or msg.video_note or msg.animation):
+    if delete_videos and (msg.video or msg.video_note or msg.animation):
         return "video"
+    if delete_photos and (msg.photo or (msg.document and (msg.document.mime_type or "").startswith("image/"))):
+        return "rasm"
 
     text = msg.text or msg.caption or ""
     entities = msg.entities or msg.caption_entities or []
@@ -108,8 +140,43 @@ async def start(msg: Message) -> None:
     )
 
 
-@dp.message(F.chat.type.in_({ChatType.GROUP, ChatType.SUPERGROUP}))
-@dp.edited_message(F.chat.type.in_({ChatType.GROUP, ChatType.SUPERGROUP}))
+GROUPS = F.chat.type.in_({ChatType.GROUP, ChatType.SUPERGROUP})
+
+
+def _on_off(v: bool) -> str:
+    return "✅ o'chiriladi" if v else "❌ o'chirilmaydi"
+
+
+async def _toggle(msg: Message, bot: Bot, key: str, label: str) -> None:
+    if not msg.from_user or not await is_admin(bot, msg.chat.id, msg.from_user.id):
+        return
+    new = not chat_setting(msg.chat.id, key)
+    set_chat_setting(msg.chat.id, key, new)
+    await msg.answer(f"{label}: {_on_off(new)}")
+
+
+@dp.message(Command("rasm"), GROUPS)
+async def toggle_photos(msg: Message, bot: Bot) -> None:
+    await _toggle(msg, bot, "photos", "Rasmlar")
+
+
+@dp.message(Command("video"), GROUPS)
+async def toggle_videos(msg: Message, bot: Bot) -> None:
+    await _toggle(msg, bot, "videos", "Videolar")
+
+
+@dp.message(Command("sozlamalar"), GROUPS)
+async def show_settings(msg: Message) -> None:
+    await msg.answer(
+        "Havolalar va reklama: ✅ o'chiriladi\n"
+        f"Rasmlar: {_on_off(chat_setting(msg.chat.id, 'photos'))}  (/rasm)\n"
+        f"Videolar: {_on_off(chat_setting(msg.chat.id, 'videos'))}  (/video)\n"
+        "Buyruqlar faqat adminlar uchun ishlaydi."
+    )
+
+
+@dp.message(GROUPS)
+@dp.edited_message(GROUPS)
 async def moderate(msg: Message, bot: Bot) -> None:
     # Guruhning o'zi nomidan (anonim admin) yoki bog'langan kanaldan kelgan xabarlar
     if msg.sender_chat and msg.sender_chat.id == msg.chat.id:
@@ -117,7 +184,11 @@ async def moderate(msg: Message, bot: Bot) -> None:
     if msg.is_automatic_forward:
         return
 
-    reason = find_violation(msg)
+    reason = find_violation(
+        msg,
+        delete_photos=chat_setting(msg.chat.id, "photos"),
+        delete_videos=chat_setting(msg.chat.id, "videos"),
+    )
     if not reason:
         return
 

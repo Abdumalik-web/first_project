@@ -18,3 +18,12 @@ assert find_violation(m("bos", [MessageEntity(type="text_link", offset=0, length
 fo = MessageOriginChannel(date=datetime.now(), chat=Chat(id=-200, type="channel"), message_id=5)
 assert find_violation(m("hi", forward_origin=fo)) == "forward"
 print("OK")
+
+from aiogram.types import PhotoSize, Video
+ph = [PhotoSize(file_id="x", file_unique_id="y", width=1, height=1)]
+assert find_violation(m(None, photo=ph)) is None
+assert find_violation(m(None, photo=ph), delete_photos=True) == "rasm"
+vid = Video(file_id="v", file_unique_id="w", width=1, height=1, duration=1)
+assert find_violation(m(None, video=vid)) is None
+assert find_violation(m(None, video=vid), delete_videos=True) == "video"
+print("OK media")
