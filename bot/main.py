@@ -40,7 +40,7 @@ async def main() -> None:
     housekeeping = asyncio.create_task(svc.run_housekeeping_loop())
     try:
         await bot.delete_webhook(drop_pending_updates=False)
-        await dp.start_polling(bot)
+        await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
     finally:
         housekeeping.cancel()
         await db.close()

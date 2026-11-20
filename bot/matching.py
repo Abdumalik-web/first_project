@@ -91,3 +91,36 @@ def rank_trips(
     ]
     out.sort(key=lambda m: (m.score, m.trip_id))
     return out
+
+
+def rank_trips_for_lead(
+    direction: str,
+    fergana_code: str,
+    tashkent_code: str | None,
+    slot: str | None,
+    seats: int | None,
+    trips: Iterable[Mapping[str, Any]],
+) -> list[Match]:
+    """Guruhdan topilgan yo'lovchi uchun mos e'lonlar (sana oldindan filtrlangan)."""
+    if direction == TO_TASHKENT:
+        _, plat, plon = FERGANA[fergana_code]
+    elif tashkent_code:
+        _, plat, plon = TASHKENT[tashkent_code]
+    else:
+        plat, plon = TASHKENT_CENTER
+    out = []
+    for t in trips:
+        if t["status"] != "active" or t["direction"] != direction:
+            continue
+        if fergana_code not in t["districts"].split(","):
+            continue
+        if seats and t["seats_free"] < seats:
+            continue
+        diff = slot_distance(t["slot"], slot) if slot else 0
+        if diff > MAX_SLOT_DIFF:
+            continue
+        dlat, dlon = driver_point(t)
+        dist = haversine_km(plat, plon, dlat, dlon)
+        out.append(Match(trip_id=t["id"], distance_km=round(dist, 1), score=dist + SLOT_PENALTY_KM * diff))
+    out.sort(key=lambda m: (m.score, m.trip_id))
+    return out

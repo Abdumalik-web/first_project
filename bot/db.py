@@ -62,6 +62,29 @@ CREATE TABLE IF NOT EXISTS offers (
     created_at      TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS groups (
+    id          INTEGER PRIMARY KEY,           -- Telegram chat id
+    title       TEXT,
+    username    TEXT,
+    active      INTEGER NOT NULL DEFAULT 1,
+    added_at    TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS group_leads (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    chat_id         INTEGER NOT NULL,
+    message_id      INTEGER NOT NULL,
+    user_id         INTEGER,
+    text_hash       TEXT NOT NULL,
+    direction       TEXT NOT NULL,
+    fergana_code    TEXT NOT NULL,
+    trip_date       TEXT,
+    sent_count      INTEGER NOT NULL DEFAULT 0,
+    created_at      TEXT NOT NULL,
+    UNIQUE(chat_id, message_id)
+);
+CREATE INDEX IF NOT EXISTS ix_leads_dup ON group_leads(user_id, text_hash, created_at);
+
 CREATE INDEX IF NOT EXISTS ix_trips_match ON trips(status, direction, trip_date);
 CREATE INDEX IF NOT EXISTS ix_requests_status ON requests(status, trip_date);
 CREATE INDEX IF NOT EXISTS ix_offers_req ON offers(request_id, status);
@@ -384,4 +407,65 @@ class Database:
         return await self.fetchall(
             "SELECT * FROM users WHERE username LIKE ? OR full_name LIKE ? OR phone LIKE ? LIMIT ?",
             like, like, like, limit,
+        )
+
+    # --- guruhlar ------------------------------------------------------------
+    async def upsert_group(self, chat_id: int, title: str | None, username: str | None,
+                           active: bool = True) -> None:
+        await self.execute(
+            """INSERT INTO groups(id, title, username, active, added_at) VALUES(?,?,?,?,?)
+               ON CONFLICT(id) DO UPDATE SET title=excluded.title, username=excluded.username,
+                                             active=excluded.active""",
+            chat_id, title, username, int(active), now_iso(),
+        )
+
+    async def is_duplicate_lead(self, user_id: int | None, text_hash: str, since_iso: str) -> bool:
+        row = await self.fetchone(
+            "SELECT 1 FROM group_leads WHERE user_id IS ? AND text_hash=? AND created_at >= ?",
+            user_id, text_hash, since_iso,
+        )
+        return row is not None
+
+    async def add_lead(self, chat_id: int, message_id: int, user_id: int | None, text_hash: str,
+                       direction: str, fergana_code: str, trip_date: str | None) -> int | None:
+        """Yangi bo'lsa id qaytaradi, shu xabar oldin qayta ishlangan bo'lsa None."""
+        async with self.lock:
+            cur = await self.conn.execute(
+                """INSERT OR IGNORE INTO group_leads(chat_id, message_id, user_id, text_hash,
+                       direction, fergana_code, trip_date, created_at) VALUES(?,?,?,?,?,?,?,?)""",
+                (chat_id, message_id, user_id, text_hash, direction, fergana_code, trip_date, now_iso()),
+            )
+            await self.conn.commit()
+            return cur.lastrowid if cur.rowcount == 1 else None
+
+    async def set_lead_sent(self, lead_id: int, n: int) -> None:
+        await self.execute("UPDATE group_leads SET sent_count=? WHERE id=?", n, lead_id)
+
+    async def active_trips_on(self, direction: str, dates: list[str]):
+        marks = ",".join("?" * len(dates))
+        return await self.fetchall(
+            f"SELECT * FROM trips WHERE status='active' AND direction=? AND seats_free > 0"
+            f" AND trip_date IN ({marks})",
+            direction, *dates,
+        )
+
+    async def group_stats(self, today_iso: str) -> dict[str, int]:
+        q = {
+            "groups": "SELECT COUNT(*) FROM groups WHERE active=1",
+            "leads_today": "SELECT COUNT(*) FROM group_leads WHERE substr(created_at,1,10)=?",
+            "leads_sent_today": "SELECT COUNT(*) FROM group_leads WHERE sent_count>0"
+                                " AND substr(created_at,1,10)=?",
+            "leads_total": "SELECT COUNT(*) FROM group_leads",
+        }
+        out = {}
+        for k, sql in q.items():
+            row = await self.fetchone(sql, *((today_iso,) if "?" in sql else ()))
+            out[k] = row[0]
+        return out
+
+    async def list_groups(self):
+        return await self.fetchall(
+            """SELECT g.*, (SELECT COUNT(*) FROM group_leads l WHERE l.chat_id=g.id) AS leads,
+                      (SELECT COUNT(*) FROM group_leads l WHERE l.chat_id=g.id AND l.sent_count>0) AS sent
+               FROM groups g ORDER BY g.active DESC, leads DESC"""
         )

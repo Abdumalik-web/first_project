@@ -83,11 +83,31 @@ bot/
   keyboards.py, texts.py
   middlewares.py # bloklangan foydalanuvchilarni to'xtatish
   voice.py       # ovoz -> matn -> e'lon ma'lumotlari
-  handlers/      # common, admin, driver, passenger, offers, voice
+  group_parser.py # guruh xabarlaridan yo'lovchini ajratish
+  handlers/      # common, admin, driver, passenger, offers, voice, group
 tests/           # matching, service va to'liq oqim testlari
 ```
 
 Tuman koordinatalari taxminiy (tuman markazlari); aniqroq natija uchun foydalanuvchilar lokatsiya yuborishi tavsiya etiladi.
+
+## Guruhlardan yo'lovchi topish (bepul)
+
+Botni taksi guruhlariga qo'shsangiz, u guruhda **hech narsa yozmaydi**, faqat o'qiydi.
+Yo'lovchi xabarini topsa (masalan *«Ertaga Qo'qondan Toshkentga 2 kishi kerak 90 123 45 67»*),
+undan yo'nalish, tuman, sana, vaqt, kishi soni, telefon va username'ni ajratadi va
+**faol e'loni bor, mos keladigan eng yaqin haydovchilarga** (ko'pi bilan 5 ta) yuboradi.
+
+- Lotin, kirill va rus tilidagi odatiy xabarlarni tushunadi (kalit so'zlar bo'yicha).
+- Haydovchilarning o'z e'lonlari («joy bor», «ketyapmiz», «Cobalt»...) e'tiborsiz qoldiriladi.
+- Bir xil e'lon bir nechta guruhga tashlansa, haydovchiga bir marta boradi (6 soat ichida).
+- Sana aytilmasa, bugungi va ertangi e'lonlar bilan solishtiriladi.
+
+**Sozlash (guruhda admin bo'lish shart emas):**
+
+1. BotFather → `/setprivacy` → botingiz → **Disable**. Busiz bot guruhdagi oddiy xabarlarni ko'rmaydi.
+2. Botni guruhga qo'shing. Agar bot privacy o'chirilishidan **oldin** qo'shilgan bo'lsa,
+   uni guruhdan chiqarib, qayta qo'shing.
+3. Admin panel → **👥 Guruhlar**: qaysi guruhdan nechta yo'lovchi topilgani.
 
 ## Ovozli xabar orqali e'lon
 

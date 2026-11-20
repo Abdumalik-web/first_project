@@ -20,7 +20,7 @@ class BanMiddleware(BaseMiddleware):
         if user and user.id not in data["config"].admin_ids and await db.is_banned(user.id):
             if isinstance(event, CallbackQuery):
                 await event.answer("Siz bloklangansiz.", show_alert=True)
-            elif isinstance(event, Message):
+            elif isinstance(event, Message) and event.chat.type == "private":
                 await event.answer("🚫 Siz botdan foydalanishdan bloklangansiz.")
             return None
         return await handler(event, data)

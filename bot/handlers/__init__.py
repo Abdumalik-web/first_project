@@ -1,16 +1,24 @@
-from aiogram import Router
+from aiogram import F, Router
 
-from . import admin, common, driver, offers, passenger, voice
+from . import admin, common, driver, group, offers, passenger, voice
 
 
 def setup_routers() -> Router:
     root = Router()
+
+    # Shaxsiy chat: bot bilan suhbat
+    private = Router(name="private")
+    private.message.filter(F.chat.type == "private")
     # common birinchi: /start va "Bekor qilish" har qanday holatda ishlashi uchun
-    root.include_router(common.router)
-    root.include_router(admin.router)
-    root.include_router(driver.router)
-    root.include_router(passenger.router)
-    root.include_router(offers.router)
+    private.include_router(common.router)
+    private.include_router(admin.router)
+    private.include_router(driver.router)
+    private.include_router(passenger.router)
+    private.include_router(offers.router)
     # voice oxirida: admin xabar tarqatishda ovozli xabar ham yuborishi mumkin
-    root.include_router(voice.router)
+    private.include_router(voice.router)
+
+    root.include_router(private)
+    # Guruhlar: bot faqat o'qiydi, hech narsa yozmaydi
+    root.include_router(group.router)
     return root

@@ -56,8 +56,8 @@ async def app(tmp_path):
     yield bot, dp, db
     await db.close()
     # Modul darajasidagi routerlarni keyingi test uchun ajratamiz
-    from bot.handlers import admin, common, driver, offers, passenger, voice
-    for m in (admin, common, driver, offers, passenger, voice):
+    from bot.handlers import admin, common, driver, group, offers, passenger, voice
+    for m in (admin, common, driver, group, offers, passenger, voice):
         m.router._parent_router = None
 
 
@@ -149,6 +149,8 @@ async def test_admin_panel(app):
     assert any("Admin panel" in t for t in bot.texts_to(ADMIN))
     await click(bot, dp, ADMIN, "adm:stats")
     assert any("Foydalanuvchilar: <b>3</b>" in t for t in bot.texts_to(ADMIN))
+    await click(bot, dp, ADMIN, "adm:groups")
+    assert any("Kuzatilayotgan guruhlar" in t for t in bot.texts_to(ADMIN))
 
     # Xabar tarqatish
     await click(bot, dp, ADMIN, "adm:bc")
@@ -253,3 +255,53 @@ def _bytes():
     async def _f():
         return io.BytesIO(b"OGG")
     return _f()
+
+
+# --- Guruhlar ----------------------------------------------------------------
+async def group_msg(bot, dp, chat_id, uid, text, title="Taksi Qo'qon-Toshkent", username=None):
+    m = Message(message_id=next(_ids), date=datetime.now(),
+                chat=Chat(id=chat_id, type="supergroup", title=title, username=username),
+                from_user=_user(uid), text=text)
+    await dp.feed_update(bot, Update(update_id=next(_ids), message=m))
+
+
+async def test_group_lead_forwarded_to_matching_driver(app):
+    bot, dp, db = app
+    tomorrow = (today() + timedelta(days=1)).isoformat()
+    D1, D2, D_OTHER = 901, 902, 903
+    for d in (D1, D2, D_OTHER):
+        await db.upsert_user(d, f"D{d}", None)
+    await db.create_trip(D1, "F2T", ["qoqon", "dangara"], tomorrow, "morning", 4, "Cobalt", None, None, None)
+    await db.create_trip(D2, "F2T", ["fargona_sh", "qoqon"], tomorrow, "morning", 4, None, None, None, None)
+    await db.create_trip(D_OTHER, "F2T", ["quva"], tomorrow, "morning", 4, None, None, None, None)
+
+    G1, G2, PAX = -1001234567890, -1009999999999, 950
+    await group_msg(bot, dp, G1, PAX, "Ertaga ertalab Qo'qondan Toshkentga 2 kishi kerak 90 123 45 67")
+
+    # Bot guruhga hech narsa yozmaydi
+    assert bot.texts_to(G1) == []
+    d1 = bot.texts_to(D1)
+    assert d1 and "Guruhdan yo'lovchi" in d1[-1] and "+998901234567" in d1[-1]
+    assert "Qo'qon ➜ Toshkent" in d1[-1]
+    assert bot.texts_to(D2)  # u ham Qo'qonni oladi
+    assert bot.texts_to(D_OTHER) == []  # Quva — mos emas
+    # Eng yaqin haydovchi birinchi (D1 bazasi Qo'qon, D2 bazasi Farg'ona)
+    first = next(m.chat_id for m in bot.calls if isinstance(m, SendMessage) and m.chat_id in (D1, D2))
+    assert first == D1
+    # Xabarga havola: https://t.me/c/1234567890/<id>
+    kb = next(m.reply_markup for m in bot.calls if isinstance(m, SendMessage) and m.chat_id == D1)
+    assert kb.inline_keyboard[0][0].url.startswith("https://t.me/c/1234567890/")
+
+    # Shu e'lon boshqa guruhga ham tashlansa — qayta yuborilmaydi
+    n = len(bot.texts_to(D1))
+    await group_msg(bot, dp, G2, PAX, "Ertaga ertalab Qo'qondan Toshkentga 2 kishi kerak 90 123 45 67")
+    assert len(bot.texts_to(D1)) == n
+
+    # Haydovchining e'loni va oddiy gaplar e'tiborsiz qoladi
+    await group_msg(bot, dp, G1, 951, "Qo'qondan Toshkentga ketyapmiz 3 joy bor Cobalt")
+    await group_msg(bot, dp, G1, 952, "/start")
+    assert len(bot.texts_to(D1)) == n
+    assert bot.texts_to(G1) == [] and bot.texts_to(G2) == []
+
+    s = await db.group_stats(datetime.now().date().isoformat())
+    assert s["groups"] == 2 and s["leads_total"] == 1

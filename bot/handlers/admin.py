@@ -5,6 +5,7 @@ Faqat .env dagi ADMIN_IDS ro'yxatidagi foydalanuvchilar uchun.
 from __future__ import annotations
 
 import asyncio
+from html import escape
 from datetime import datetime, timezone
 
 from aiogram import Bot, F, Router
@@ -52,6 +53,7 @@ def admin_kb() -> InlineKeyboardMarkup:
             [b(text="📊 Statistika", callback_data="adm:stats")],
             [b(text="🚗 Faol e'lonlar", callback_data="adm:trips"),
              b(text="🧍 Kutayotgan so'rovlar", callback_data="adm:reqs")],
+            [b(text="👥 Guruhlar", callback_data="adm:groups")],
             [b(text="📢 Hammaga xabar yuborish", callback_data="adm:bc")],
             [b(text="🚫 Bloklash bo'yicha yordam", callback_data="adm:banhelp")],
         ]
@@ -133,6 +135,28 @@ async def list_requests(cb: CallbackQuery, db: Database) -> None:
             f"Yo'lovchi: {texts.contact_line(r)} (id {r['passenger_id']})"
         )
     await _send_chunks(cb.message, lines, "Haydovchi kutayotgan so'rovlar yo'q.")
+    await cb.answer()
+
+
+@router.callback_query(F.data == "adm:groups")
+async def groups(cb: CallbackQuery, db: Database) -> None:
+    s = await db.group_stats(datetime.now(timezone.utc).date().isoformat())
+    lines = [
+        "👥 <b>Guruhlar</b>\n"
+        f"Kuzatilayotgan guruhlar: <b>{s['groups']}</b>\n"
+        f"Bugun topilgan yo'lovchilar: <b>{s['leads_today']}</b> "
+        f"(haydovchiga yuborilgan: {s['leads_sent_today']})\n"
+        f"Jami topilgan: {s['leads_total']}"
+    ]
+    for g in await db.list_groups():
+        status = "✅" if g["active"] else "❌ chiqarilgan"
+        name = escape(g["title"] or str(g["id"]))
+        lines.append(f"{status} {name} — {g['leads']} ta yo'lovchi, {g['sent']} tasi yuborildi")
+    lines.append(
+        "\nBotni guruhga qo'shish: guruh → Add members → botingiz. "
+        "Avval BotFather'da /setprivacy → Disable qilingan bo'lishi kerak."
+    )
+    await _send_chunks(cb.message, lines, "")
     await cb.answer()
 
 
