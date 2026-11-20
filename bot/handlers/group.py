@@ -36,7 +36,8 @@ def message_link(message: Message) -> str | None:
     return None
 
 
-def lead_text(lead: Lead, message: Message, trip_date: str | None, distance_km: float) -> str:
+def lead_text(lead: Lead, message: Message, trip_date: str | None, distance_km: float,
+              covered: bool = True) -> str:
     route_t = tashkent_name(lead.tashkent_code) if lead.tashkent_code else "Toshkent"
     route = (f"{fergana_name(lead.fergana_code)} ➜ {route_t}" if lead.direction == "F2T"
              else f"{route_t} ➜ {fergana_name(lead.fergana_code)}")
@@ -50,6 +51,8 @@ def lead_text(lead: Lead, message: Message, trip_date: str | None, distance_km: 
     if lead.seats:
         lines.append(f"Kishi soni: {lead.seats}")
     lines.append(f"📏 Sizdan taxminan {distance_km:g} km")
+    if not covered:
+        lines.append(f"ℹ️ {fergana_name(lead.fergana_code)} tumani e'loningizda yo'q, lekin siz eng yaqin haydovchisiz.")
     body = (message.text or message.caption or "")[:600]
     lines += ["", f"<i>«{escape(body)}»</i>", ""]
 
@@ -126,7 +129,7 @@ async def on_group_message(message: Message, db: Database, bot: Bot) -> None:
             continue
         try:
             await bot.send_message(
-                driver_id, lead_text(lead, message, trip_date or trip["trip_date"], m.distance_km),
+                driver_id, lead_text(lead, message, trip_date or trip["trip_date"], m.distance_km, m.covered),
                 reply_markup=kb, disable_web_page_preview=True,
             )
             sent_to.add(driver_id)

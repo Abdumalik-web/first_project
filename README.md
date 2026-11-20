@@ -14,13 +14,16 @@ Yo'nalish: Farg'ona viloyati tumanlari ➜ Toshkent va Toshkent ➜ Farg'ona vil
    → lokatsiya (ixtiyoriy) → izoh → telefon.
 3. **Moslashtirish** (`bot/matching.py`). Haydovchi mos keladi, agar:
    - yo'nalish va sana bir xil bo'lsa;
-   - yo'lovchining tumani haydovchi tanlagan tumanlar ichida bo'lsa;
    - bo'sh o'rin yetarli bo'lsa;
    - vaqt oralig'i bir xil yoki qo'shni bo'lsa.
 
-   Mos haydovchilar **masofa** bo'yicha tartiblanadi: yo'lovchini olib ketish nuqtasi
-   (lokatsiya yoki tuman markazi) bilan haydovchining joylashuvi (lokatsiya yoki u
-   tanlagan birinchi tuman) orasidagi km. Vaqt oralig'i farq qilsa, jarima qo'shiladi.
+   Tuman **qat'iy shart emas**: Toshkentdan chiqqan yo'lovchi Toshkentdagi, Farg'onadan
+   chiqqan yo'lovchi Farg'onadagi **eng yaqin** haydovchiga yuboriladi. Mos haydovchilar
+   **masofa** bo'yicha tartiblanadi: yo'lovchini olib ketish nuqtasi (lokatsiya yoki tuman
+   markazi) bilan haydovchining joylashuvi (lokatsiya yoki u tanlagan birinchi tuman) orasidagi km.
+   Yo'lovchining tumani haydovchi e'lonida bo'lmasa +20 km, vaqt oralig'i farq qilsa +40 km
+   jarima qo'shiladi — shunda tumani mos haydovchi ustun turadi, lekin u bo'lmasa eng yaqin
+   boshqa haydovchiga darhol yuboriladi (haydovchiga «tumani e'loningizda yo'q» deb yoziladi).
 4. So'rov **eng yaqin** haydovchiga «✅ Olaman / ❌ Rad etish» tugmalari bilan yuboriladi.
    - **Olaman** → ikkalasiga bir-birining ismi va telefon raqami yuboriladi, o'rin kamayadi.
    - **Rad etish** yoki 5 daqiqa javob yo'q → so'rov keyingi eng yaqin haydovchiga o'tadi.

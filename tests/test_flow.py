@@ -304,7 +304,10 @@ async def test_group_lead_forwarded_to_matching_driver(app):
     assert d1 and "Guruhdan yo'lovchi" in d1[-1] and "+998901234567" in d1[-1]
     assert "Qo'qon ➜ Toshkent" in d1[-1]
     assert bot.texts_to(D2)  # u ham Qo'qonni oladi
-    assert bot.texts_to(D_OTHER) == []  # Quva — mos emas
+    # Quvadagi haydovchi ham oladi (tuman shart emas), lekin oxirida va ogohlantirish bilan
+    assert bot.texts_to(D_OTHER) and "e'loningizda yo'q" in bot.texts_to(D_OTHER)[-1]
+    order = [m.chat_id for m in bot.calls if isinstance(m, SendMessage) and m.chat_id in (D1, D2, D_OTHER)]
+    assert order[-1] == D_OTHER
     # Eng yaqin haydovchi birinchi (D1 bazasi Qo'qon, D2 bazasi Farg'ona)
     first = next(m.chat_id for m in bot.calls if isinstance(m, SendMessage) and m.chat_id in (D1, D2))
     assert first == D1

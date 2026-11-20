@@ -70,7 +70,7 @@ class MatchService:
                 passenger = await self.db.get_user(req["passenger_id"])
                 msg = await self._send(
                     trip["driver_id"],
-                    texts.offer_text(req, passenger, m.distance_km, self.config.offer_timeout_min),
+                    texts.offer_text(req, passenger, m.distance_km, self.config.offer_timeout_min, m.covered),
                     reply_markup=offer_kb(offer_id),
                 )
                 if msg is None:  # haydovchiga yetkazib bo'lmadi — keyingisiga

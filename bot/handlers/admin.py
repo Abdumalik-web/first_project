@@ -290,11 +290,12 @@ async def check_text(message: Message, command: CommandObject, db: Database) -> 
     ]
     for m in matches[:5]:
         t = trips[m.trip_id]
-        lines.append(f"• E'lon #{t['id']} (haydovchi id {t['driver_id']}), {m.distance_km:g} km")
+        mark = "" if m.covered else " (tumani e'lonida yo'q)"
+        lines.append(f"• E'lon #{t['id']} (haydovchi id {t['driver_id']}), {m.distance_km:g} km{mark}")
     if not matches:
         lines.append(
-            "\nMos haydovchi yo'q. Haydovchining e'lonida shu tuman tanlanganmi, sanasi "
-            "va vaqti to'g'ri keladimi — tekshiring."
+            "\nMos haydovchi yo'q. Shu yo'nalishda faol e'lon bormi, sanasi va vaqti "
+            "to'g'ri keladimi, bo'sh o'rni yetarlimi — tekshiring."
         )
     await message.answer("\n".join(lines))
 

@@ -11,9 +11,27 @@ def req(fergana="qoqon", tashkent="chilonzor", slot="morning", seats=1, lat=None
                 trip_date="2026-11-21", slot=slot, seats=seats, lat=lat, lon=lon)
 
 
-def test_district_must_be_covered():
+def test_district_is_preference_not_filter():
+    # Tuman mos kelmasa ham haydovchi ro'yxatda, lekin mosi oldinda
     trips = [trip(1, ["quva", "margilon"]), trip(2, ["qoqon", "dangara", "beshariq"])]
-    assert [m.trip_id for m in rank_trips(req(), trips)] == [2]
+    ranked = rank_trips(req(), trips)
+    assert [m.trip_id for m in ranked] == [2, 1]
+    assert ranked[0].covered and not ranked[1].covered
+
+
+def test_from_tashkent_nearest_driver_regardless_of_destination():
+    # Toshkentdan Qo'qonga: Chilonzordagi haydovchi (Quvaga boradi) Yunusoboddagidan
+    # (Qo'qonga boradi) ancha yaqin bo'lsa ham, tuman jarimasi bilan solishtiriladi
+    near = trip(1, ["quva"], direction="T2F", lat=41.273, lon=69.204)      # Chilonzor
+    far = trip(2, ["qoqon"], direction="T2F", lat=41.364, lon=69.285)      # Yunusobod, ~12 km
+    r = req(direction="T2F", tashkent="chilonzor", fergana="qoqon")
+    ranked = rank_trips(r, [near, far])
+    assert {m.trip_id for m in ranked} == {1, 2}  # ikkalasi ham mos
+    # ~0 km + 20 jarima vs ~12 km — tumani mos kelgan oldinda
+    assert ranked[0].trip_id == 2
+    # Lekin uzoqroq haydovchi (30 km+) bo'lsa — yaqinroq haydovchi oldinda
+    very_far = trip(3, ["qoqon"], direction="T2F", lat=41.55, lon=69.50)
+    assert rank_trips(r, [near, very_far])[0].trip_id == 1
 
 
 def test_nearest_driver_first():

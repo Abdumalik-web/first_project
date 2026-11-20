@@ -67,12 +67,15 @@ def request_text(r: Mapping[str, Any]) -> str:
 
 
 def offer_text(r: Mapping[str, Any], passenger: Mapping[str, Any], distance_km: float,
-               timeout_min: int) -> str:
+               timeout_min: int, covered: bool = True) -> str:
+    note = "" if covered else (
+        f"ℹ️ {fergana_name(r['fergana_code'])} tumani e'loningizda yo'q, lekin siz eng yaqin haydovchisiz.\n"
+    )
     return (
         "🔔 <b>Yangi yo'lovchi!</b>\n\n"
         f"{request_text(r)}\n"
         f"Yo'lovchi: {escape(passenger['full_name'] or '')}\n"
-        f"📏 Sizdan taxminan <b>{distance_km:g} km</b>\n\n"
+        f"📏 Sizdan taxminan <b>{distance_km:g} km</b>\n{note}\n"
         f"Olasizmi? {timeout_min} daqiqa ichida javob bering, aks holda so'rov boshqa haydovchiga o'tadi."
     )
 

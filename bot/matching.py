@@ -2,11 +2,13 @@
 
 Qoidalar:
   * yo'nalish va sana bir xil bo'lishi kerak;
-  * yo'lovchining Farg'ona tumani haydovchi yuradigan tumanlar ichida bo'lishi kerak;
   * haydovchida yetarli bo'sh o'rin bo'lishi kerak;
   * vaqt oralig'i bir xil yoki qo'shni bo'lishi kerak.
-Mos kelganlar orasida eng yaqini tanlanadi: olib ketish nuqtasi bilan
-haydovchining joylashuvi orasidagi masofa + vaqt farqi uchun jarima.
+Tuman qat'iy shart emas: Toshkentdan chiqqan yo'lovchi Toshkentdagi, Farg'onadan
+chiqqan yo'lovchi Farg'onadagi eng yaqin haydovchiga yuboriladi. Yo'lovchining
+tumani haydovchi tanlagan tumanlar ichida bo'lsa, u haydovchi ustun turadi.
+Ball: olib ketish nuqtasi bilan haydovchining joylashuvi orasidagi masofa
++ vaqt farqi uchun jarima + tuman mos kelmasa jarima.
 """
 from __future__ import annotations
 
@@ -26,6 +28,8 @@ TASHKENT_CENTER = (41.3111, 69.2797)
 # Vaqt oralig'i bitta farq qilsa, uni shuncha km masofaga teng deb hisoblaymiz
 SLOT_PENALTY_KM = 40.0
 MAX_SLOT_DIFF = 1
+# Yo'lovchining tumani haydovchi e'lonida bo'lmasa — shuncha km qo'shiladi
+UNCOVERED_PENALTY_KM = 20.0
 
 
 @dataclass(frozen=True)
@@ -33,6 +37,7 @@ class Match:
     trip_id: int
     distance_km: float
     score: float
+    covered: bool = True  # yo'lovchining tumani haydovchi e'lonida bormi
 
 
 def pickup_point(req: Mapping[str, Any]) -> tuple[float, float]:
@@ -65,7 +70,6 @@ def is_compatible(req: Mapping[str, Any], trip: Mapping[str, Any]) -> bool:
         and trip["trip_date"] == req["trip_date"]
         and trip["driver_id"] != req["passenger_id"]
         and trip["seats_free"] >= req["seats"]
-        and req["fergana_code"] in trip["districts"].split(",")
         and slot_distance(trip["slot"], req["slot"]) <= MAX_SLOT_DIFF
     )
 
@@ -74,8 +78,11 @@ def score(req: Mapping[str, Any], trip: Mapping[str, Any]) -> Match:
     plat, plon = pickup_point(req)
     dlat, dlon = driver_point(trip)
     dist = haversine_km(plat, plon, dlat, dlon)
+    covered = req["fergana_code"] in trip["districts"].split(",")
     s = dist + SLOT_PENALTY_KM * slot_distance(trip["slot"], req["slot"])
-    return Match(trip_id=trip["id"], distance_km=round(dist, 1), score=s)
+    if not covered:
+        s += UNCOVERED_PENALTY_KM
+    return Match(trip_id=trip["id"], distance_km=round(dist, 1), score=s, covered=covered)
 
 
 def rank_trips(
@@ -112,8 +119,6 @@ def rank_trips_for_lead(
     for t in trips:
         if t["status"] != "active" or t["direction"] != direction:
             continue
-        if fergana_code not in t["districts"].split(","):
-            continue
         if seats and t["seats_free"] < seats:
             continue
         diff = slot_distance(t["slot"], slot) if slot else 0
@@ -121,6 +126,8 @@ def rank_trips_for_lead(
             continue
         dlat, dlon = driver_point(t)
         dist = haversine_km(plat, plon, dlat, dlon)
-        out.append(Match(trip_id=t["id"], distance_km=round(dist, 1), score=dist + SLOT_PENALTY_KM * diff))
+        covered = fergana_code in t["districts"].split(",")
+        sc = dist + SLOT_PENALTY_KM * diff + (0 if covered else UNCOVERED_PENALTY_KM)
+        out.append(Match(trip_id=t["id"], distance_km=round(dist, 1), score=sc, covered=covered))
     out.sort(key=lambda m: (m.score, m.trip_id))
     return out
