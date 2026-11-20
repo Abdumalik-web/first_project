@@ -344,9 +344,9 @@ async def main() -> None:
     if REQUIRED_BOT_TOKEN:
         _required_bot = Bot(REQUIRED_BOT_TOKEN)
         req = await _required_bot.me()
-        print(f"Guruhga yozish uchun start bosilishi kerak bo'lgan bot: @{req.username}")
+        logging.info("Guruhga yozish uchun start bosilishi kerak bo'lgan bot: @%s", req.username)
     me = await bot.get_me()
-    print(f"Bot ishga tushdi: @{me.username}  (to'xtatish uchun Ctrl+C)")
+    logging.info("Bot ishga tushdi: @%s  (to'xtatish uchun Ctrl+C)", me.username)
     await dp.start_polling(bot, allowed_updates=["message", "edited_message"])
 
 
