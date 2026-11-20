@@ -56,8 +56,8 @@ async def app(tmp_path):
     yield bot, dp, db
     await db.close()
     # Modul darajasidagi routerlarni keyingi test uchun ajratamiz
-    from bot.handlers import admin, common, driver, offers, passenger
-    for m in (admin, common, driver, offers, passenger):
+    from bot.handlers import admin, common, driver, offers, passenger, voice
+    for m in (admin, common, driver, offers, passenger, voice):
         m.router._parent_router = None
 
 
@@ -167,3 +167,89 @@ async def test_admin_panel(app):
 
     await send(bot, dp, U1, "/id")
     assert str(U1) in bot.texts_to(U1)[-1]
+
+
+# --- Ovozli xabar ------------------------------------------------------------
+class FakeParser:
+    """Tarmoqqa chiqmaydigan soxta ovoz xizmati."""
+
+    def __init__(self, text, data):
+        self.text, self.data = text, data
+
+    async def transcribe(self, audio, filename="voice.ogg"):
+        assert audio == b"OGG"
+        return self.text
+
+    async def extract(self, text, today_):
+        from bot.voice import to_parsed
+        return to_parsed(self.data, today_)
+
+
+def _voice_data(**kw):
+    base = dict(role="unknown", direction="unknown", fergana_districts=[], tashkent_district="unknown",
+                date="unknown", slot="unknown", seats=0, car="", price="", comment="")
+    base.update(kw)
+    return base
+
+
+async def send_voice(bot, dp, uid):
+    from aiogram.types import Voice
+    v = Voice(file_id="f", file_unique_id="u", duration=5)
+    await send(bot, dp, uid, voice=v)
+
+
+async def test_voice_passenger_fills_only_missing(app, monkeypatch):
+    bot, dp, db = app
+    monkeypatch.setattr(RecBot, "download", lambda self, *a, **k: _bytes(), raising=False)
+    dp["voice_parser"] = FakeParser(
+        "Ertaga ertalab Qo'qondan Toshkentga Chilonzorga ikki kishimiz",
+        _voice_data(role="passenger", direction="F2T", fergana_districts=["qoqon"],
+                    tashkent_district="chilonzor", date="tomorrow", slot="morning", seats=2),
+    )
+    PAX = 801
+    await send(bot, dp, PAX, "/start")
+    await send(bot, dp, PAX, "+998901112200")  # telefon hali yo'q — keyin so'raladi
+    await send_voice(bot, dp, PAX)
+    out = bot.texts_to(PAX)
+    assert any("Siz aytdingiz" in t for t in out)
+    # Barcha asosiy ma'lumot ovozdan olindi — faqat lokatsiya so'raladi
+    assert "lokatsiya" in out[-1]
+    await send(bot, dp, PAX, "⏭ O'tkazib yuborish")
+    assert "Telefon" in bot.texts_to(PAX)[-1]
+    await send(bot, dp, PAX, "+998901112200")
+    assert "Qo'qon ➜ Toshkent (Chilonzor)" in bot.texts_to(PAX)[-1]
+    assert "Kishi soni: 2" in bot.texts_to(PAX)[-1]
+    await click(bot, dp, PAX, "ps:ok")
+    reqs = await db.open_requests_of(PAX)
+    assert len(reqs) == 1 and reqs[0]["fergana_code"] == "qoqon" and reqs[0]["seats"] == 2
+
+
+async def test_voice_driver_asks_missing_and_role(app, monkeypatch):
+    bot, dp, db = app
+    monkeypatch.setattr(RecBot, "download", lambda self, *a, **k: _bytes(), raising=False)
+    dp["voice_parser"] = FakeParser(
+        "Bugun kechqurun Toshkentdan Qo'qon Dang'ara tomonga uchta joy bor",
+        _voice_data(direction="T2F", fergana_districts=["qoqon", "dangara"], date="today",
+                    slot="evening", seats=3),
+    )
+    D = 802
+    await send(bot, dp, D, "/start")
+    await send_voice(bot, dp, D)
+    assert "haydovchimisiz" in bot.texts_to(D)[-1]  # rol aniq emas — so'raladi
+    await click(bot, dp, D, "vc:role:driver")
+    assert "Mashinangiz" in bot.texts_to(D)[-1]  # yo'nalish/tuman/sana/vaqt/o'rin ovozdan olindi
+
+
+async def test_voice_disabled_message(app):
+    bot, dp, db = app
+    dp["voice_parser"] = None
+    await send_voice(bot, dp, 803)
+    assert "hozircha ishlamaydi" in bot.texts_to(803)[-1]
+
+
+def _bytes():
+    import io
+
+    async def _f():
+        return io.BytesIO(b"OGG")
+    return _f()

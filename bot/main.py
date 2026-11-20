@@ -11,6 +11,7 @@ from .db import Database
 from .handlers import setup_routers
 from .middlewares import BanMiddleware
 from .service import MatchService
+from .voice import VoiceParser
 
 
 async def main() -> None:
@@ -27,6 +28,9 @@ async def main() -> None:
     dp["db"] = db
     dp["svc"] = svc
     dp["config"] = config
+    dp["voice_parser"] = VoiceParser(config) if config.voice_enabled else None
+    if not config.voice_enabled:
+        logging.info("Ovozli xabarlar o'chiq (ANTHROPIC_API_KEY va STT_API_KEY kerak).")
     dp.message.outer_middleware(BanMiddleware())
     dp.callback_query.outer_middleware(BanMiddleware())
     dp.include_router(setup_routers())

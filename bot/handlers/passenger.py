@@ -1,4 +1,9 @@
-"""Yo'lovchi so'rov qoldirish jarayoni."""
+"""Yo'lovchi so'rov qoldirish jarayoni.
+
+Har bir qadamdan keyin `next_step` chaqiriladi: u hali to'ldirilmagan birinchi
+maydonni so'raydi. Shu tufayli ovozli xabardan olingan ma'lumotlar bilan ham
+ishlaydi — faqat yetishmayotgan savollar beriladi.
+"""
 from __future__ import annotations
 
 from aiogram import F, Router
@@ -57,88 +62,133 @@ class PassengerForm(StatesGroup):
     confirm = State()
 
 
+async def next_step(message: Message, state: FSMContext, db: Database, user_id: int) -> None:
+    """Birinchi to'ldirilmagan maydonni so'raydi."""
+    d = await state.get_data()
+    to_t = d.get("direction") == TO_TASHKENT
+    if not d.get("direction"):
+        await state.set_state(PassengerForm.direction)
+        await message.answer("Qayerga borasiz?", reply_markup=direction_kb(P))
+    elif not d.get("fergana_code"):
+        await state.set_state(PassengerForm.fergana)
+        q = "Farg'ona viloyatining qaysi tumanidan chiqasiz?" if to_t \
+            else "Farg'ona viloyatining qaysi tumaniga borasiz?"
+        await message.answer(q, reply_markup=fergana_kb(P))
+    elif not d.get("tashkent_code"):
+        await state.set_state(PassengerForm.tashkent)
+        q = "Toshkentning qaysi tumaniga borasiz?" if to_t else "Toshkentning qaysi tumanidan chiqasiz?"
+        await message.answer(q, reply_markup=tashkent_kb(P))
+    elif not d.get("trip_date"):
+        await state.set_state(PassengerForm.date)
+        await message.answer("Qaysi kuni?", reply_markup=date_kb(P))
+    elif not d.get("slot"):
+        await state.set_state(PassengerForm.slot)
+        await message.answer("Qaysi vaqtda?", reply_markup=slot_kb(P))
+    elif not d.get("seats"):
+        await state.set_state(PassengerForm.seats)
+        await message.answer("Necha kishisiz?", reply_markup=seats_kb(P, 4))
+    elif "lat" not in d:
+        await state.set_state(PassengerForm.location)
+        where = "uyingiz / chiqadigan joyingiz" if to_t else "Toshkentdagi turgan joyingiz"
+        await message.answer(
+            f"📍 {where.capitalize()} lokatsiyasini yuboring — shunda sizga <b>eng yaqin</b> "
+            "haydovchini topamiz. Xohlamasangiz o'tkazib yuboring.",
+            reply_markup=location_kb(),
+        )
+    elif "comment" not in d:
+        await state.set_state(PassengerForm.comment)
+        await message.answer(
+            "Haydovchi uchun izoh (masalan: «yukim bor», «oldingi o'rindiq») yoki o'tkazib yuboring:",
+            reply_markup=skip_kb(),
+        )
+    elif not await _has_phone(db, user_id):
+        await state.set_state(PassengerForm.phone)
+        await message.answer(
+            "Telefon raqamingizni yuboring (tugmani bosing yoki +998XXXXXXXXX ko'rinishida yozing):",
+            reply_markup=phone_kb(),
+        )
+    else:
+        await show_confirm(message, state)
+
+
+async def _has_phone(db: Database, uid: int) -> bool:
+    user = await db.get_user(uid)
+    return bool(user and user["phone"])
+
+
+async def _done(cb: CallbackQuery, text: str) -> None:
+    """Tanlangan qiymatni ko'rsatib, tugmalarni olib tashlaydi."""
+    try:
+        await cb.message.edit_text(text)
+    except Exception:  # noqa: BLE001 — xabar o'zgarmagan bo'lsa ham davom etamiz
+        pass
+    await cb.answer()
+
+
 @router.message(StateFilter(None), F.text == BTN_PASSENGER)
 async def start_passenger(message: Message, state: FSMContext, db: Database) -> None:
     u = message.from_user
     await db.upsert_user(u.id, u.full_name, u.username)
-    await state.set_state(PassengerForm.direction)
+    await state.set_data({})
     await message.answer("🧍 Yangi so'rov. Bekor qilish uchun ❌ tugmasini bosing.", reply_markup=cancel_kb())
-    await message.answer("Qayerga borasiz?", reply_markup=direction_kb(P))
+    await next_step(message, state, db, u.id)
 
 
 @router.callback_query(PassengerForm.direction, F.data.startswith(f"{P}:dir:"))
-async def set_direction(cb: CallbackQuery, state: FSMContext) -> None:
+async def set_direction(cb: CallbackQuery, state: FSMContext, db: Database) -> None:
     direction = cb.data.split(":")[2]
     await state.update_data(direction=direction)
-    await state.set_state(PassengerForm.fergana)
-    q = "Farg'ona viloyatining qaysi tumanidan chiqasiz?" if direction == TO_TASHKENT \
-        else "Farg'ona viloyatining qaysi tumaniga borasiz?"
-    await cb.message.edit_text(f"Yo'nalish: <b>{DIRECTIONS[direction]}</b>\n\n{q}", reply_markup=fergana_kb(P))
-    await cb.answer()
+    await _done(cb, f"Yo'nalish: <b>{DIRECTIONS[direction]}</b>")
+    await next_step(cb.message, state, db, cb.from_user.id)
 
 
 @router.callback_query(PassengerForm.fergana, F.data.startswith(f"{P}:fd:"))
-async def set_fergana(cb: CallbackQuery, state: FSMContext) -> None:
+async def set_fergana(cb: CallbackQuery, state: FSMContext, db: Database) -> None:
     code = cb.data.split(":")[2]
     await state.update_data(fergana_code=code)
-    data = await state.get_data()
-    await state.set_state(PassengerForm.tashkent)
-    q = "Toshkentning qaysi tumaniga borasiz?" if data["direction"] == TO_TASHKENT \
-        else "Toshkentning qaysi tumanidan chiqasiz?"
-    await cb.message.edit_text(f"Tuman: <b>{fergana_name(code)}</b>\n\n{q}", reply_markup=tashkent_kb(P))
-    await cb.answer()
+    await _done(cb, f"Tuman: <b>{fergana_name(code)}</b>")
+    await next_step(cb.message, state, db, cb.from_user.id)
 
 
 @router.callback_query(PassengerForm.tashkent, F.data.startswith(f"{P}:td:"))
-async def set_tashkent(cb: CallbackQuery, state: FSMContext) -> None:
+async def set_tashkent(cb: CallbackQuery, state: FSMContext, db: Database) -> None:
     code = cb.data.split(":")[2]
     await state.update_data(tashkent_code=code)
-    await state.set_state(PassengerForm.date)
-    await cb.message.edit_text(f"Toshkent: <b>{tashkent_name(code)}</b>\n\nQaysi kuni?", reply_markup=date_kb(P))
-    await cb.answer()
+    await _done(cb, f"Toshkent: <b>{tashkent_name(code)}</b>")
+    await next_step(cb.message, state, db, cb.from_user.id)
 
 
 @router.callback_query(PassengerForm.date, F.data.startswith(f"{P}:date:"))
-async def set_date(cb: CallbackQuery, state: FSMContext) -> None:
+async def set_date(cb: CallbackQuery, state: FSMContext, db: Database) -> None:
     d = cb.data.split(":")[2]
     await state.update_data(trip_date=d)
-    await state.set_state(PassengerForm.slot)
-    await cb.message.edit_text(f"Sana: <b>{fmt_date(d)}</b>\n\nQaysi vaqtda?", reply_markup=slot_kb(P))
-    await cb.answer()
+    await _done(cb, f"Sana: <b>{fmt_date(d)}</b>")
+    await next_step(cb.message, state, db, cb.from_user.id)
 
 
 @router.callback_query(PassengerForm.slot, F.data.startswith(f"{P}:slot:"))
-async def set_slot(cb: CallbackQuery, state: FSMContext) -> None:
+async def set_slot(cb: CallbackQuery, state: FSMContext, db: Database) -> None:
     slot = cb.data.split(":")[2]
     await state.update_data(slot=slot)
-    await state.set_state(PassengerForm.seats)
-    await cb.message.edit_text(f"Vaqt: <b>{slot_name(slot)}</b>\n\nNecha kishisiz?", reply_markup=seats_kb(P, 4))
-    await cb.answer()
+    await _done(cb, f"Vaqt: <b>{slot_name(slot)}</b>")
+    await next_step(cb.message, state, db, cb.from_user.id)
 
 
 @router.callback_query(PassengerForm.seats, F.data.startswith(f"{P}:seats:"))
-async def set_seats(cb: CallbackQuery, state: FSMContext) -> None:
+async def set_seats(cb: CallbackQuery, state: FSMContext, db: Database) -> None:
     seats = int(cb.data.split(":")[2])
     await state.update_data(seats=seats)
-    await state.set_state(PassengerForm.location)
-    data = await state.get_data()
-    where = "uyingiz / chiqadigan joyingiz" if data["direction"] == TO_TASHKENT else "Toshkentdagi turgan joyingiz"
-    await cb.message.edit_text(f"Kishi soni: <b>{seats}</b>")
-    await cb.message.answer(
-        f"📍 {where.capitalize()} lokatsiyasini yuboring — shunda sizga <b>eng yaqin</b> "
-        "haydovchini topamiz. Xohlamasangiz o'tkazib yuboring.",
-        reply_markup=location_kb(),
-    )
-    await cb.answer()
+    await _done(cb, f"Kishi soni: <b>{seats}</b>")
+    await next_step(cb.message, state, db, cb.from_user.id)
 
 
 @router.message(PassengerForm.location, F.location | (F.text == BTN_SKIP))
-async def set_location(message: Message, state: FSMContext) -> None:
+async def set_location(message: Message, state: FSMContext, db: Database) -> None:
     data = await state.get_data()
     if message.location:
         lat, lon = message.location.latitude, message.location.longitude
         await state.update_data(lat=lat, lon=lon)
-        # Toshkentdan chiqsa va tuman noto'g'ri tanlangan bo'lsa — lokatsiyaga qarab aniqlaymiz
+        # Toshkentdan chiqsa — tumanni lokatsiyaga qarab aniqlaymiz
         if data["direction"] != TO_TASHKENT:
             await state.update_data(tashkent_code=nearest_district(TASHKENT, lat, lon))
         else:
@@ -150,26 +200,14 @@ async def set_location(message: Message, state: FSMContext) -> None:
                 )
     else:
         await state.update_data(lat=None, lon=None)
-    await state.set_state(PassengerForm.comment)
-    await message.answer(
-        "Haydovchi uchun izoh (masalan: «yukim bor», «oldingi o'rindiq») yoki o'tkazib yuboring:",
-        reply_markup=skip_kb(),
-    )
+    await next_step(message, state, db, message.from_user.id)
 
 
 @router.message(PassengerForm.comment, F.text)
 async def set_comment(message: Message, state: FSMContext, db: Database) -> None:
     comment = None if message.text == BTN_SKIP else message.text.strip()[:200]
     await state.update_data(comment=comment)
-    user = await db.get_user(message.from_user.id)
-    if user and user["phone"]:
-        await show_confirm(message, state)
-    else:
-        await state.set_state(PassengerForm.phone)
-        await message.answer(
-            "Telefon raqamingizni yuboring (tugmani bosing yoki +998XXXXXXXXX ko'rinishida yozing):",
-            reply_markup=phone_kb(),
-        )
+    await next_step(message, state, db, message.from_user.id)
 
 
 @router.message(PassengerForm.phone, F.contact | F.text)
@@ -180,7 +218,7 @@ async def set_phone(message: Message, state: FSMContext, db: Database) -> None:
         await message.answer("Raqam noto'g'ri. Masalan: +998901234567", reply_markup=phone_kb())
         return
     await db.set_phone(message.from_user.id, phone)
-    await show_confirm(message, state)
+    await next_step(message, state, db, message.from_user.id)
 
 
 async def show_confirm(message: Message, state: FSMContext) -> None:

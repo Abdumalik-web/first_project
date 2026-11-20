@@ -82,11 +82,33 @@ bot/
   db.py          # SQLite (aiosqlite)
   keyboards.py, texts.py
   middlewares.py # bloklangan foydalanuvchilarni to'xtatish
-  handlers/      # common, admin, driver, passenger, offers
+  voice.py       # ovoz -> matn -> e'lon ma'lumotlari
+  handlers/      # common, admin, driver, passenger, offers, voice
 tests/           # matching, service va to'liq oqim testlari
 ```
 
 Tuman koordinatalari taxminiy (tuman markazlari); aniqroq natija uchun foydalanuvchilar lokatsiya yuborishi tavsiya etiladi.
+
+## Ovozli xabar orqali e'lon
+
+Foydalanuvchi botga ovozli xabar yuborishi mumkin, masalan: *«Ertaga ertalab Qo'qondan
+Toshkentga, Chilonzorga, ikki kishimiz»*. Bot:
+
+1. ovozni matnga aylantiradi (standart: OpenAI Whisper);
+2. Claude yordamida matndan yo'nalish, tuman, sana, vaqt, kishi soni va boshqalarni ajratadi;
+3. faqat **yetishmayotgan** ma'lumotni tugmalar bilan so'raydi va tasdiqlashni ko'rsatadi.
+
+Rol aniq bo'lmasa (haydovchi yoki yo'lovchi), bot so'raydi. E'lon to'ldirilayotgan paytda
+ovozli xabar yuborilsa, u o'sha e'londagi bo'sh maydonlarni to'ldiradi.
+
+Yoqish uchun `.env` ga ikkita kalit yozing va botni qayta ishga tushiring:
+
+```
+ANTHROPIC_API_KEY=...   # console.anthropic.com
+STT_API_KEY=...         # platform.openai.com (yoki boshqa OpenAI-mos xizmat, STT_URL bilan)
+```
+
+Kalitlar bo'lmasa, bot ovozli xabarga «tugmalar orqali tanlang» deb javob beradi.
 
 ## Serverga (VPS) joylash — bot 24/7 ishlaydi
 
