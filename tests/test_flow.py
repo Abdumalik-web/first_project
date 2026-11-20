@@ -108,6 +108,9 @@ async def test_full_flow(app):
     await send(bot, dp, D, "150 000")
     await send(bot, dp, D, contact=Contact(phone_number="998901112233", first_name="D"))
     await send(bot, dp, D, location=Location(latitude=40.53, longitude=70.94))
+    assert "guruhlarga" in bot.texts_to(D)[-1]
+    await click(bot, dp, D, "dr:pub:1")
+    assert "Guruhlarga: joylanadi" in bot.texts_to(D)[-1]
     await click(bot, dp, D, "dr:ok")
     trips = await db.active_trips_of(D)
     assert len(trips) == 1 and trips[0]["districts"] == "qoqon,dangara,buvayda"
@@ -400,3 +403,59 @@ async def test_group_ads(app):
     out = bot.texts_to(970)
     assert "Toshkent ➜ Farg'ona" in out[-2] and "qaysi tumaniga" in out[-1]
     assert await db.count_users_from_ads() == 1
+
+
+
+async def test_driver_trips_posted_to_admin_groups(app):
+    from aiogram.methods import DeleteMessage
+    from bot.ads import AdService
+    bot, dp, db = app
+    ads = AdService(bot, db)
+    G = -1003333333333
+    bot.admin_chats = {G}
+    await group_msg(bot, dp, G, 980, "Salom")
+    tomorrow = (today() + timedelta(days=1)).isoformat()
+    D_YES, D_NO = 981, 982
+    for d, name in ((D_YES, "Ali"), (D_NO, "Vali")):
+        await db.upsert_user(d, name, f"user{d}")
+        await db.set_phone(d, f"+99890000{d:04d}")
+    t_yes = await db.create_trip(D_YES, "T2F", ["qoqon", "dangara"], tomorrow, "evening", 3,
+                                 "Cobalt oq", "150 000", None, None, publish=True)
+    await db.create_trip(D_NO, "F2T", ["quva"], tomorrow, "morning", 4, None, None, None, None, publish=False)
+
+    def posts():
+        return [m for m in bot.calls if isinstance(m, SendMessage) and m.chat_id == G]
+
+    assert await ads.tick_trips() == 1  # faqat rozi bo'lgan haydovchi
+    txt = posts()[-1].text
+    assert "Toshkent ➜ Qo'qon, Dang'ara" in txt and "+998900000981" in txt and "@user981" in txt
+    assert "Cobalt oq" in txt and "150 000" in txt and "Bo'sh joy: <b>3</b>" in txt
+    assert "+998900000982" not in txt
+
+    # Soat o'tmagan — qayta joylanmaydi
+    assert await ads.tick_trips() == 0
+    # Soat o'tdi — eski post o'chiriladi, yangisi joylanadi
+    await db.execute("UPDATE trip_posts SET posted_at='2000-01-01T00:00:00+00:00'")
+    first_msg = (await db.get_trip_post(t_yes, G))["message_id"]
+    assert await ads.tick_trips() == 1
+    assert any(isinstance(m, DeleteMessage) and m.message_id == first_msg for m in bot.calls)
+
+    # Joylar to'lsa — guruhdan o'chiriladi va boshqa joylanmaydi
+    await db.execute("UPDATE trips SET seats_free=0 WHERE id=?", t_yes)
+    last_msg = (await db.get_trip_post(t_yes, G))["message_id"]
+    assert await ads.tick_trips() == 0
+    assert any(isinstance(m, DeleteMessage) and m.message_id == last_msg for m in bot.calls)
+    assert await db.get_trip_post(t_yes, G) is None
+
+    # Admin: /elon holati va /elon_hozir
+    await send(bot, dp, 900, "/elon")
+    assert "Haydovchi e'lonlarini" in bot.texts_to(900)[-1]
+    await db.execute("UPDATE trips SET seats_free=2 WHERE id=?", t_yes)
+    await send(bot, dp, 900, "/elon_hozir")
+    assert "1 ta e'lon" in bot.texts_to(900)[-1]
+
+    # Haydovchi "Mening e'lonlarim"dan o'chirib-yoqishi mumkin
+    await db.execute("UPDATE trips SET seats_free=2 WHERE id=?", t_yes)
+    await click(bot, dp, D_YES, f"tm:pub:{t_yes}")
+    assert (await db.get_trip(t_yes))["publish"] == 0
+    assert await ads.tick_trips() == 0

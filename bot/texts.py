@@ -83,3 +83,29 @@ def offer_text(r: Mapping[str, Any], passenger: Mapping[str, Any], distance_km: 
 def contact_line(u: Mapping[str, Any]) -> str:
     phone = escape(u["phone"]) if u["phone"] else "ko'rsatilmagan"
     return f"{user_link(u['full_name'], u['username'])}\n📞 {phone}"
+
+
+def trip_post_text(t: Mapping[str, Any]) -> str:
+    """Haydovchi e'loni guruhga joylanadigan ko'rinishda (t — trips + users ustunlari)."""
+    districts = ", ".join(fergana_name(c) for c in t["districts"].split(","))
+    route = f"{districts} ➜ Toshkent" if t["direction"] == "F2T" else f"Toshkent ➜ {districts}"
+    lines = [
+        "🚗 <b>Haydovchi e'loni</b>",
+        "",
+        f"🛣 <b>{route}</b>",
+        f"📅 {fmt_date(t['trip_date'])}, {slot_name(t['slot'])}",
+        f"💺 Bo'sh joy: <b>{t['seats_free']}</b>",
+    ]
+    if t["car"]:
+        lines.append(f"🚘 Mashina: {escape(t['car'])}")
+    if t["price"]:
+        lines.append(f"💵 Narx: {escape(t['price'])}")
+    lines.append("")
+    if t["phone"]:
+        lines.append(f"📞 {escape(t['phone'])}")
+    name = escape(t["full_name"] or "Haydovchi")
+    account = f'<a href="tg://user?id={t["driver_id"]}">{name}</a>'
+    if t["username"]:
+        account += f" — @{escape(t['username'])}"
+    lines.append(f"👤 {account}")
+    return "\n".join(lines)

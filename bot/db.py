@@ -70,6 +70,14 @@ CREATE TABLE IF NOT EXISTS groups (
     added_at    TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS trip_posts (
+    trip_id     INTEGER NOT NULL,
+    chat_id     INTEGER NOT NULL,
+    message_id  INTEGER NOT NULL,
+    posted_at   TEXT NOT NULL,
+    PRIMARY KEY (trip_id, chat_id)
+);
+
 CREATE TABLE IF NOT EXISTS settings (
     key     TEXT PRIMARY KEY,
     value   TEXT NOT NULL
@@ -121,6 +129,7 @@ class Database:
         await self._ensure_column("groups", "ad_msg_f2t", "INTEGER")
         await self._ensure_column("groups", "ad_msg_t2f", "INTEGER")
         await self._ensure_column("groups", "last_ad_dir", "TEXT")
+        await self._ensure_column("trips", "publish", "INTEGER NOT NULL DEFAULT 0")
         await self.conn.commit()
 
     async def _ensure_column(self, table: str, column: str, ddl: str) -> None:
@@ -171,13 +180,13 @@ class Database:
     # --- trips ---------------------------------------------------------------
     async def create_trip(self, driver_id: int, direction: str, districts: list[str],
                           trip_date: str, slot: str, seats: int, car: str, price: str,
-                          lat: float | None, lon: float | None) -> int:
+                          lat: float | None, lon: float | None, publish: bool = False) -> int:
         return await self.execute(
             """INSERT INTO trips(driver_id, direction, districts, trip_date, slot, seats_total,
-                   seats_free, car, price, lat, lon, created_at)
-               VALUES(?,?,?,?,?,?,?,?,?,?,?,?)""",
+                   seats_free, car, price, lat, lon, publish, created_at)
+               VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             driver_id, direction, ",".join(districts), trip_date, slot, seats, seats,
-            car, price, lat, lon, now_iso(),
+            car, price, lat, lon, int(publish), now_iso(),
         )
 
     async def get_trip(self, trip_id: int):
@@ -527,3 +536,43 @@ class Database:
     async def count_users_from_ads(self) -> int:
         row = await self.fetchone("SELECT COUNT(*) FROM users WHERE source LIKE 'g%'")
         return row[0]
+
+    # --- haydovchi e'lonlarini guruhlarga joylash -----------------------------
+    async def trips_to_publish(self):
+        """Guruhga joylashga rozi bo'lgan, faol va bo'sh joyi bor e'lonlar (haydovchi ma'lumoti bilan)."""
+        return await self.fetchall(
+            """SELECT t.*, u.full_name, u.username, u.phone FROM trips t
+               JOIN users u ON u.id = t.driver_id
+               WHERE t.status='active' AND t.publish=1 AND t.seats_free > 0 AND u.banned=0
+               ORDER BY t.id"""
+        )
+
+    async def get_trip_post(self, trip_id: int, chat_id: int):
+        return await self.fetchone(
+            "SELECT * FROM trip_posts WHERE trip_id=? AND chat_id=?", trip_id, chat_id
+        )
+
+    async def save_trip_post(self, trip_id: int, chat_id: int, message_id: int) -> None:
+        await self.execute(
+            """INSERT INTO trip_posts(trip_id, chat_id, message_id, posted_at) VALUES(?,?,?,?)
+               ON CONFLICT(trip_id, chat_id) DO UPDATE SET message_id=excluded.message_id,
+                                                         posted_at=excluded.posted_at""",
+            trip_id, chat_id, message_id, now_iso(),
+        )
+
+    async def stale_trip_posts(self):
+        """O'chirilishi kerak bo'lgan postlar: e'lon yopilgan, joy qolmagan yoki rozilik yo'q."""
+        return await self.fetchall(
+            """SELECT p.* FROM trip_posts p JOIN trips t ON t.id = p.trip_id
+               JOIN users u ON u.id = t.driver_id
+               WHERE t.status != 'active' OR t.seats_free <= 0 OR t.publish = 0 OR u.banned = 1"""
+        )
+
+    async def delete_trip_post(self, trip_id: int, chat_id: int) -> None:
+        await self.execute("DELETE FROM trip_posts WHERE trip_id=? AND chat_id=?", trip_id, chat_id)
+
+    async def toggle_trip_publish(self, trip_id: int) -> bool:
+        """Guruhga joylashni almashtiradi, yangi holatni qaytaradi."""
+        await self.execute("UPDATE trips SET publish = 1 - publish WHERE id=?", trip_id)
+        row = await self.fetchone("SELECT publish FROM trips WHERE id=?", trip_id)
+        return bool(row and row["publish"])

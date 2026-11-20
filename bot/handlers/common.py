@@ -142,6 +142,14 @@ async def trip_manage(cb: CallbackQuery, db: Database, svc: MatchService) -> Non
         await cb.message.answer("\n".join(lines))
         await cb.answer()
         return
+    if action == "pub":
+        on = await db.toggle_trip_publish(trip_id)
+        await cb.answer(
+            "📢 E'lon guruhlarga joylanadi (bir daqiqa ichida)." if on else
+            "E'lon guruhlarga joylanmaydi, mavjud postlar o'chiriladi.",
+            show_alert=True,
+        )
+        return
     status = "done" if action == "done" else "cancelled"
     if await svc.close_trip(trip_id, cb.from_user.id, status):
         msg = "🏁 E'lon yakunlandi. Yaxshi yo'l!" if status == "done" else "🗑 E'lon bekor qilindi."

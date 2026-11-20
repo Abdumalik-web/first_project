@@ -87,7 +87,7 @@ bot/
   middlewares.py # bloklangan foydalanuvchilarni to'xtatish
   voice.py       # ovoz -> matn -> e'lon ma'lumotlari
   group_parser.py # guruh xabarlaridan yo'lovchini ajratish
-  ads.py         # admin bo'lgan guruhlarga muntazam reklama
+  ads.py         # admin bo'lgan guruhlarga reklama va haydovchi e'lonlari
   handlers/      # common, admin, driver, passenger, offers, voice, group
 tests/           # matching, service va to'liq oqim testlari
 ```
@@ -134,6 +134,18 @@ Boshqaruv (admin): `/reklama` (holati va har bir guruh nima uchun kutayotgani), 
 `/reklama_matn1 <matn>` (Farg'ona ➜ Toshkent), `/reklama_matn2 <matn>` (Toshkent ➜ Farg'ona),
 `/reklama_tugma1`, `/reklama_tugma2`, `/reklama_hozir`.
 Botni guruhda admin qilganda **«Delete messages»** huquqi bo'lsin.
+
+## Haydovchi e'lonlarini guruhlarga joylash
+
+E'lon berishda bot haydovchidan so'raydi: *«E'loningiz guruhlarga ham joylansinmi?»*
+Rozi bo'lsa, bot admin bo'lgan guruhlarga **har soatda** (sozlanadi) shunday post joylaydi:
+yo'nalish (tumanlar ➜ Toshkent yoki aksincha), sana va vaqt, bo'sh joylar, mashina, narx,
+**telefon raqami va Telegram akkaunti**, hamda «Bot orqali joy band qilish» tugmasi.
+
+- Har soatda e'lonning eski posti o'chirilib, yangisi joylanadi — guruhda har haydovchidan bittadan.
+- E'lon yakunlansa, bekor qilinsa yoki joylar to'lsa — post guruhdan avtomatik o'chiriladi.
+- Haydovchi «📋 Mening e'lonlarim» ➜ «📢 Guruhlarga joylash» bilan istalgan payt yoqib-o'chiradi.
+- Admin: `/elon` (holati), `/elon_on`, `/elon_off`, `/elon_vaqt 60`, `/elon_hozir`.
 
 ## Ovozli xabar orqali e'lon
 

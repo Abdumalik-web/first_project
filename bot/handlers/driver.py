@@ -5,7 +5,13 @@ from aiogram import F, Router
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import CallbackQuery, Message, ReplyKeyboardRemove
+from aiogram.types import (
+    CallbackQuery,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    Message,
+    ReplyKeyboardRemove,
+)
 
 from .. import texts
 from ..db import Database
@@ -44,6 +50,7 @@ class DriverForm(StatesGroup):
     price = State()
     phone = State()
     location = State()
+    publish = State()
     confirm = State()
 
 
@@ -94,8 +101,24 @@ async def next_step(message: Message, state: FSMContext, db: Database, user_id: 
             "yuboriladi. Keyinroq ham «📍 Joylashuvni yangilash» tugmasi bilan yangilashingiz mumkin.",
             reply_markup=location_kb(),
         )
+    elif "publish" not in d:
+        await state.set_state(DriverForm.publish)
+        await message.answer("📍 Rahmat.", reply_markup=ReplyKeyboardRemove())
+        await message.answer(
+            "📢 E'loningiz bot admin bo'lgan <b>guruhlarga</b> ham joylansinmi? Har soatda "
+            "yangilanadi, unda <b>telefon raqamingiz va Telegram akkauntingiz</b> ko'rinadi — "
+            "yo'lovchilar sizga to'g'ridan-to'g'ri bog'lanishi mumkin.",
+            reply_markup=publish_kb(),
+        )
     else:
         await show_confirm(message, state)
+
+
+def publish_kb() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text="✅ Ha, joylansin", callback_data=f"{P}:pub:1"),
+        InlineKeyboardButton(text="❌ Yo'q", callback_data=f"{P}:pub:0"),
+    ]])
 
 
 async def _has_phone(db: Database, uid: int) -> bool:
@@ -205,6 +228,14 @@ async def set_phone(message: Message, state: FSMContext, db: Database) -> None:
     await next_step(message, state, db, message.from_user.id)
 
 
+@router.callback_query(DriverForm.publish, F.data.startswith(f"{P}:pub:"))
+async def set_publish(cb: CallbackQuery, state: FSMContext, db: Database) -> None:
+    publish = cb.data.endswith(":1")
+    await state.update_data(publish=publish)
+    await _done(cb, "📢 Guruhlarga: " + ("<b>joylanadi</b>" if publish else "<b>joylanmaydi</b>"))
+    await next_step(cb.message, state, db, cb.from_user.id)
+
+
 @router.message(DriverForm.location, F.location | (F.text == BTN_SKIP))
 async def set_location(message: Message, state: FSMContext, db: Database) -> None:
     if message.location:
@@ -229,8 +260,9 @@ async def show_confirm(message: Message, state: FSMContext) -> None:
         "price": data.get("price"),
         "lat": data.get("lat"),
     }
+    pub = "\n📢 Guruhlarga: " + ("joylanadi" if data.get("publish") else "joylanmaydi")
     await message.answer("Tekshiring:", reply_markup=ReplyKeyboardRemove())
-    await message.answer(texts.trip_text(preview), reply_markup=confirm_kb(P))
+    await message.answer(texts.trip_text(preview) + pub, reply_markup=confirm_kb(P))
 
 
 @router.callback_query(DriverForm.confirm, F.data.in_({f"{P}:ok", f"{P}:no"}))
@@ -246,6 +278,7 @@ async def confirm(cb: CallbackQuery, state: FSMContext, db: Database, svc: Match
     trip_id = await db.create_trip(
         cb.from_user.id, data["direction"], data["districts"], data["trip_date"], data["slot"],
         data["seats"], data.get("car"), data.get("price"), data.get("lat"), data.get("lon"),
+        publish=bool(data.get("publish")),
     )
     await cb.message.edit_reply_markup(reply_markup=None)
     trip = await db.get_trip(trip_id)

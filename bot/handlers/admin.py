@@ -23,7 +23,7 @@ from aiogram.types import (
 
 from .. import texts
 from ..ads import K_ACTIVITY as AD_ACTIVITY, K_ENABLED as AD_ENABLED, K_INTERVAL as AD_INTERVAL
-from ..ads import MIN_INTERVAL_MIN, AdService, ad_settings, k_button, k_text
+from ..ads import K_TRIPS_ENABLED, K_TRIPS_INTERVAL, MIN_INTERVAL_MIN, AdService, ad_settings, k_button, k_text
 from ..config import Config
 from ..db import Database
 from ..keyboards import main_menu
@@ -74,7 +74,8 @@ ADMIN_HELP = (
     "/unban <i>id</i> — blokdan chiqarish\n"
     "/del_trip <i>raqam</i> — e'lonni o'chirish\n"
     "/del_req <i>raqam</i> — so'rovni o'chirish\n"
-    "/tekshir <i>matn</i> — guruh xabarini bot qanday tushunishini ko'rish"
+    "/tekshir <i>matn</i> — guruh xabarini bot qanday tushunishini ko'rish\n"
+    "/reklama — guruh reklamasi, /elon — haydovchi e'lonlarini guruhlarga joylash"
 )
 
 
@@ -248,6 +249,51 @@ async def ads_text(message: Message, command: CommandObject, db: Database) -> No
         return
     await db.set_setting(k_button(direction) if is_button else k_text(direction), value)
     await message.answer("✅ Saqlandi. Keyingi reklamada yangi matn chiqadi.")
+
+
+@router.message(Command("elon"))
+async def trips_status(message: Message, db: Database) -> None:
+    on = await db.get_setting(K_TRIPS_ENABLED, "1") == "1"
+    interval = await db.get_setting(K_TRIPS_INTERVAL, "60")
+    trips = await db.trips_to_publish()
+    await message.answer(
+        "🚗 <b>Haydovchi e'lonlarini guruhlarga joylash</b>\n\n"
+        "Holati: " + ("✅ yoqilgan" if on else "❌ o'chirilgan") + "\n"
+        f"Har <b>{interval}</b> daqiqada har bir e'lon yangilanadi (eskisi o'chiriladi)\n"
+        f"Hozir joylanayotgan e'lonlar: <b>{len(trips)}</b>\n\n"
+        "Faqat haydovchi rozilik bergan e'lonlar va faqat bot admin bo'lgan guruhlarga. "
+        "E'lon yopilsa yoki joy qolmasa — guruhdan o'chiriladi.\n\n"
+        "/elon_on, /elon_off — yoqish / o'chirish\n"
+        f"/elon_vaqt <i>daqiqa</i> — oraliq (kamida {MIN_INTERVAL_MIN})\n"
+        "/elon_hozir — hozir hammasini joylash"
+    )
+
+
+@router.message(Command("elon_on", "elon_off"))
+async def trips_toggle(message: Message, command: CommandObject, db: Database) -> None:
+    on = command.command == "elon_on"
+    await db.set_setting(K_TRIPS_ENABLED, "1" if on else "0")
+    await message.answer("✅ Haydovchi e'lonlari guruhlarga joylanadi." if on else
+                         "❌ Haydovchi e'lonlari guruhlarga joylanmaydi.")
+
+
+@router.message(Command("elon_vaqt"))
+async def trips_interval(message: Message, command: CommandObject, db: Database) -> None:
+    arg = (command.args or "").strip()
+    if not arg.isdigit() or int(arg) < MIN_INTERVAL_MIN:
+        await message.answer(f"Masalan: <code>/elon_vaqt 60</code> (kamida {MIN_INTERVAL_MIN} daqiqa)")
+        return
+    await db.set_setting(K_TRIPS_INTERVAL, arg)
+    await message.answer(f"✅ Haydovchi e'lonlari endi har {arg} daqiqada yangilanadi.")
+
+
+@router.message(Command("elon_hozir"))
+async def trips_now(message: Message, ads: AdService) -> None:
+    n = await ads.tick_trips(force=True)
+    await message.answer(
+        f"🚗 {n} ta e'lon guruhlarga joylandi." if n else
+        "Hech narsa joylanmadi: guruhga joylashga rozi bo'lgan faol e'lon yo'q yoki bot hech bir guruhda admin emas."
+    )
 
 
 @router.message(Command("reklama_hozir"))

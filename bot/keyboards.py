@@ -152,6 +152,8 @@ def trip_manage_kb(trip_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="👥 Yo'lovchilarim", callback_data=f"tm:pax:{trip_id}")],
+            [InlineKeyboardButton(text="📢 Guruhlarga joylash: yoqish / o'chirish",
+                                  callback_data=f"tm:pub:{trip_id}")],
             [
                 InlineKeyboardButton(text="🏁 Yo'lga chiqdim / yakunlash", callback_data=f"tm:done:{trip_id}"),
             ],

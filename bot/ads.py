@@ -19,6 +19,7 @@ from aiogram import Bot
 from aiogram.exceptions import TelegramAPIError
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
+from . import texts
 from .db import Database, now_iso
 from .regions import FROM_TASHKENT, TO_TASHKENT
 
@@ -51,6 +52,11 @@ MIN_INTERVAL_MIN = 5
 
 # settings jadvalidagi kalitlar
 K_ENABLED, K_INTERVAL, K_ACTIVITY = "ad_enabled", "ad_interval_min", "ad_require_activity"
+# Haydovchi e'lonlarini guruhlarga joylash
+K_TRIPS_ENABLED, K_TRIPS_INTERVAL = "trip_post_enabled", "trip_post_interval_min"
+DEFAULT_TRIPS_INTERVAL_MIN = 60
+# Telegram cheklovi: bitta guruhga daqiqasiga ~20 xabar. Har daqiqada shundan ko'p yubormaymiz.
+MAX_TRIP_POSTS_PER_GROUP_PER_TICK = 12
 
 
 def k_text(direction: str) -> str:
@@ -168,10 +174,79 @@ class AdService:
                 await asyncio.sleep(0.2)
         return n
 
+    # --- haydovchi e'lonlari ---------------------------------------------------
+    async def admin_groups(self) -> list:
+        out = []
+        for g in await self.db.fetchall("SELECT * FROM groups WHERE active=1"):
+            if await self.is_admin_in(g["id"]):
+                out.append(g)
+        return out
+
+    async def cleanup_trip_posts(self) -> int:
+        """Yopilgan / to'lgan e'lonlarni guruhlardan o'chiradi."""
+        n = 0
+        for p in await self.db.stale_trip_posts():
+            try:
+                await self.bot.delete_message(p["chat_id"], p["message_id"])
+            except TelegramAPIError:
+                pass
+            await self.db.delete_trip_post(p["trip_id"], p["chat_id"])
+            n += 1
+        return n
+
+    async def tick_trips(self, force: bool = False) -> int:
+        """Rozi bo'lgan haydovchilar e'lonlarini har `interval` daqiqada guruhlarga joylaydi.
+
+        Har e'lonning guruhdagi eski posti o'chirilib, yangisi joylanadi.
+        """
+        await self.cleanup_trip_posts()
+        enabled = await self.db.get_setting(K_TRIPS_ENABLED, "1") == "1"
+        if not enabled and not force:
+            return 0
+        interval = int(await self.db.get_setting(K_TRIPS_INTERVAL, str(DEFAULT_TRIPS_INTERVAL_MIN)))
+        trips = await self.db.trips_to_publish()
+        if not trips:
+            return 0
+        groups = await self.admin_groups()
+        me = await self.bot.me()
+        before = (datetime.now(timezone.utc) - timedelta(minutes=interval)).isoformat(timespec="seconds")
+        sent = 0
+        for g in groups:
+            per_group = 0
+            for t in trips:
+                if per_group >= MAX_TRIP_POSTS_PER_GROUP_PER_TICK:
+                    break  # qolganlari keyingi daqiqada
+                old = await self.db.get_trip_post(t["id"], g["id"])
+                if old and old["posted_at"] > before and not force:
+                    continue
+                if old:
+                    try:
+                        await self.bot.delete_message(g["id"], old["message_id"])
+                    except TelegramAPIError:
+                        pass
+                url = f"https://t.me/{me.username}?start=g{abs(g['id'])}_{t['direction']}"
+                kb = InlineKeyboardMarkup(inline_keyboard=[[
+                    InlineKeyboardButton(text="🚕 Bot orqali joy band qilish", url=url)
+                ]])
+                try:
+                    msg = await self.bot.send_message(g["id"], texts.trip_post_text(t), reply_markup=kb,
+                                                      disable_web_page_preview=True)
+                except TelegramAPIError as e:
+                    log.warning("e'lon #%s -> %s: %s", t["id"], g["title"], e)
+                    continue
+                await self.db.save_trip_post(t["id"], g["id"], msg.message_id)
+                sent += 1
+                per_group += 1
+                await asyncio.sleep(0.3)
+        if sent:
+            log.info("Haydovchi e'lonlari guruhlarga joylandi: %d ta", sent)
+        return sent
+
     async def run_loop(self, every_sec: int = 60) -> None:
         while True:
-            try:
-                await self.tick()
-            except Exception:  # noqa: BLE001
-                log.exception("reklama tsikli xatosi")
+            for job in (self.tick, self.tick_trips):
+                try:
+                    await job()
+                except Exception:  # noqa: BLE001
+                    log.exception("reklama tsikli xatosi (%s)", job.__name__)
             await asyncio.sleep(every_sec)
