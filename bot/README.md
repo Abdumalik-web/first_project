@@ -2,6 +2,7 @@
 
 Guruhdagi reklama havolalarini (t.me, @kanal, Instagram, YouTube, TikTok...),
 kanallardan forward qilingan xabarlarni va (ixtiyoriy) videolarni avtomatik o'chiradi.
+"Guruhga qo'shildi" / "guruhdan chiqdi" tizim xabarlarini ham o'chiradi.
 Adminlar xabarlariga tegmaydi.
 
 ## Ishga tushirish

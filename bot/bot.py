@@ -4,6 +4,7 @@ O'chiradi:
   - Telegram guruh/kanal havolalari (t.me, telegram.me, @username)
   - Instagram, YouTube, TikTok va boshqa havolalar
   - Kanallardan forward qilingan xabarlar
+  - "Guruhga qo'shildi" / "guruhdan chiqdi" tizim xabarlari
   - (ixtiyoriy) rasm va video xabarlar  (adminlar: /rasm, /video, /sozlamalar)
 
 Adminlar xabarlari tegilmaydi.
@@ -173,6 +174,15 @@ async def show_settings(msg: Message) -> None:
         f"Videolar: {_on_off(chat_setting(msg.chat.id, 'videos'))}  (/video)\n"
         "Buyruqlar faqat adminlar uchun ishlaydi."
     )
+
+
+@dp.message(GROUPS, F.new_chat_members | F.left_chat_member)
+async def clean_service(msg: Message) -> None:
+    """"Guruhga qo'shildi" / "guruhdan chiqdi" tizim xabarlarini o'chiradi."""
+    try:
+        await msg.delete()
+    except TelegramBadRequest as e:
+        logging.warning("Tizim xabarini o'chirib bo'lmadi (bot adminmi?): %s", e)
 
 
 @dp.message(GROUPS)
