@@ -14,8 +14,6 @@ Adminlar xabarlariga tegmaydi.
    ```
    Bot tokenni o'zi so'raydi (yozilgani ekranda ko'rinmaydi).
    Yoki oldindan bering: Linux `export BOT_TOKEN=...`, PowerShell `$env:BOT_TOKEN="..."`.
-   ```
-   ```
 4. Botni guruhga qo'shing va **admin** qiling ("Xabarlarni o'chirish" huquqi bilan).
 
 ## Sozlamalar (muhit o'zgaruvchilari)
