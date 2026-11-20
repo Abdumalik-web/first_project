@@ -23,8 +23,16 @@ class RecBot(Bot):
         super().__init__("42:TEST")
         self.calls: list[TelegramMethod] = []
 
+    admin_chats: set = set()
+
     async def __call__(self, method, request_timeout=None):
         self.calls.append(method)
+        from aiogram.methods import GetChatMember, GetMe
+        from types import SimpleNamespace
+        if isinstance(method, GetMe):
+            return User(id=42, is_bot=True, first_name="Bot", username="testbot")
+        if isinstance(method, GetChatMember):
+            return SimpleNamespace(status="administrator" if method.chat_id in self.admin_chats else "member")
         if isinstance(method, SendMessage):
             return Message(message_id=next(_ids), date=datetime.now(),
                            chat=Chat(id=method.chat_id, type="private"), text=method.text)
@@ -49,7 +57,8 @@ async def app(tmp_path):
     cfg = Config(bot_token="42:TEST", db_path="", offer_timeout_min=5, admin_ids=(900,))
     svc = MatchService(bot, db, cfg)
     dp = Dispatcher(storage=MemoryStorage())
-    dp["db"], dp["svc"], dp["config"] = db, svc, cfg
+    from bot.ads import AdService
+    dp["db"], dp["svc"], dp["config"], dp["ads"] = db, svc, cfg, AdService(bot, db)
     dp.message.outer_middleware(BanMiddleware())
     dp.callback_query.outer_middleware(BanMiddleware())
     dp.include_router(setup_routers())
@@ -166,6 +175,12 @@ async def test_admin_panel(app):
     assert "bloklangansiz" in bot.texts_to(U2)[-1]
     await send(bot, dp, ADMIN, f"/unban {U2}")
     assert not await db.is_banned(U2)
+
+    await send(bot, dp, ADMIN, "/reklama_vaqt 30")
+    assert "30 daqiqada" in bot.texts_to(ADMIN)[-1]
+    await send(bot, dp, ADMIN, "/reklama_matn Yangi reklama matni")
+    await click(bot, dp, ADMIN, "adm:ads")
+    assert "Yangi reklama matni" in bot.texts_to(ADMIN)[-1] and "Har <b>30</b>" in bot.texts_to(ADMIN)[-1]
 
     await send(bot, dp, ADMIN, "/tekshir Ertaga Qo'qondan Toshkentga 2 kishi kerak")
     assert "tanildi" in bot.texts_to(ADMIN)[-1]
@@ -310,3 +325,44 @@ async def test_group_lead_forwarded_to_matching_driver(app):
 
     s = await db.group_stats(datetime.now().date().isoformat())
     assert s["groups"] == 2 and s["leads_total"] == 1
+
+
+
+async def test_group_ads(app):
+    from aiogram.methods import DeleteMessage
+    from bot.ads import AdService
+    bot, dp, db = app
+    ads = AdService(bot, db)
+    G_ADMIN, G_MEMBER = -1001111111111, -1002222222222
+    bot.admin_chats = {G_ADMIN}
+    await group_msg(bot, dp, G_ADMIN, 960, "Salom")
+    await group_msg(bot, dp, G_MEMBER, 961, "Salom")
+
+    assert await ads.tick() == 1  # faqat admin bo'lgan guruhga
+    posted = [m for m in bot.calls if isinstance(m, SendMessage) and m.chat_id == G_ADMIN]
+    assert len(posted) == 1 and "Toshkentga" in posted[0].text
+    url = posted[0].reply_markup.inline_keyboard[0][0].url
+    assert url == "https://t.me/testbot?start=g1001111111111"
+    assert not [m for m in bot.calls if isinstance(m, SendMessage) and m.chat_id == G_MEMBER]
+
+    # Vaqti kelmagan — qayta joylanmaydi
+    assert await ads.tick() == 0
+    # Vaqti o'tdi, lekin guruhda yangi xabar yo'q — joylanmaydi
+    await db.execute("UPDATE groups SET last_ad_at='2000-01-01T00:00:00+00:00'")
+    assert await ads.tick() == 0
+    # Yangi xabar keldi — eskisi o'chiriladi, yangisi joylanadi
+    await group_msg(bot, dp, G_ADMIN, 960, "Yana salom")
+    await db.execute("UPDATE groups SET last_ad_at='2000-01-01T00:00:00+00:00'")
+    assert await ads.tick() == 1
+    assert any(isinstance(m, DeleteMessage) and m.chat_id == G_ADMIN for m in bot.calls)
+
+    # O'chirilgan bo'lsa — joylanmaydi
+    await db.set_setting("ad_enabled", "0")
+    await group_msg(bot, dp, G_ADMIN, 960, "Yana")
+    await db.execute("UPDATE groups SET last_ad_at='2000-01-01T00:00:00+00:00'")
+    assert await ads.tick() == 0
+
+    # Reklama tugmasi orqali kelgan yo'lovchi
+    await send(bot, dp, 970, "/start g1001111111111")
+    assert "Yo'lovchiman" in bot.texts_to(970)[-1]
+    assert await db.count_users_from_ads() == 1

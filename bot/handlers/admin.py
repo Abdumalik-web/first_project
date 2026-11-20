@@ -22,6 +22,8 @@ from aiogram.types import (
 )
 
 from .. import texts
+from ..ads import K_BUTTON as AD_BUTTON, K_ENABLED as AD_ENABLED, K_INTERVAL as AD_INTERVAL
+from ..ads import K_TEXT as AD_TEXT, MIN_INTERVAL_MIN, AdService, ad_settings
 from ..config import Config
 from ..db import Database
 from ..keyboards import main_menu
@@ -55,7 +57,8 @@ def admin_kb() -> InlineKeyboardMarkup:
             [b(text="📊 Statistika", callback_data="adm:stats")],
             [b(text="🚗 Faol e'lonlar", callback_data="adm:trips"),
              b(text="🧍 Kutayotgan so'rovlar", callback_data="adm:reqs")],
-            [b(text="👥 Guruhlar", callback_data="adm:groups")],
+            [b(text="👥 Guruhlar", callback_data="adm:groups"),
+             b(text="📣 Guruh reklamasi", callback_data="adm:ads")],
             [b(text="📢 Hammaga xabar yuborish", callback_data="adm:bc")],
             [b(text="🚫 Bloklash bo'yicha yordam", callback_data="adm:banhelp")],
         ]
@@ -161,6 +164,77 @@ async def groups(cb: CallbackQuery, db: Database) -> None:
     )
     await _send_chunks(cb.message, lines, "")
     await cb.answer()
+
+
+async def _ads_status_text(db: Database) -> str:
+    cfg = await ad_settings(db)
+    came = await db.count_users_from_ads()
+    return (
+        "📣 <b>Guruh reklamasi</b>\n\n"
+        "Holati: " + ("✅ yoqilgan" if cfg["enabled"] else "❌ o'chirilgan") + "\n"
+        f"Har <b>{cfg['interval']}</b> daqiqada (guruhda yangi xabar bo'lsa)\n"
+        f"Reklama orqali botga kelganlar: <b>{came}</b>\n\n"
+        "Reklama faqat bot <b>admin</b> bo'lgan guruhlarga joylanadi. Yangisidan oldin "
+        "eskisi o'chiriladi.\n\n"
+        "Buyruqlar:\n"
+        "/reklama_on — yoqish, /reklama_off — o'chirish\n"
+        f"/reklama_vaqt <i>daqiqa</i> — oraliq (kamida {MIN_INTERVAL_MIN})\n"
+        "/reklama_matn <i>matn</i> — reklama matnini o'zgartirish\n"
+        "/reklama_tugma <i>matn</i> — tugma yozuvini o'zgartirish\n"
+        "/reklama_hozir — hozir barcha guruhlarga joylash\n\n"
+        "<b>Hozirgi matn:</b>\n" + escape(cfg["text"]) + f"\n\n<b>Tugma:</b> {escape(cfg['button'])}"
+    )
+
+
+@router.callback_query(F.data == "adm:ads")
+async def ads_menu(cb: CallbackQuery, db: Database) -> None:
+    await cb.message.answer(await _ads_status_text(db))
+    await cb.answer()
+
+
+@router.message(Command("reklama"))
+async def ads_status(message: Message, db: Database) -> None:
+    await message.answer(await _ads_status_text(db))
+
+
+@router.message(Command("reklama_on", "reklama_off"))
+async def ads_toggle(message: Message, command: CommandObject, db: Database) -> None:
+    on = command.command == "reklama_on"
+    await db.set_setting(AD_ENABLED, "1" if on else "0")
+    await message.answer("✅ Guruh reklamasi yoqildi." if on else "❌ Guruh reklamasi o'chirildi.")
+
+
+@router.message(Command("reklama_vaqt"))
+async def ads_interval(message: Message, command: CommandObject, db: Database) -> None:
+    arg = (command.args or "").strip()
+    if not arg.isdigit() or int(arg) < MIN_INTERVAL_MIN:
+        await message.answer(f"Masalan: <code>/reklama_vaqt 30</code> (kamida {MIN_INTERVAL_MIN} daqiqa)")
+        return
+    await db.set_setting(AD_INTERVAL, arg)
+    await message.answer(f"✅ Reklama endi har {arg} daqiqada joylanadi.")
+
+
+@router.message(Command("reklama_matn", "reklama_tugma"))
+async def ads_text(message: Message, command: CommandObject, db: Database) -> None:
+    # Buyruqdan keyingi matn, qator tashlashlar bilan birga
+    text = (message.text or "").split(maxsplit=1)
+    value = text[1].strip() if len(text) > 1 else ""
+    is_button = command.command == "reklama_tugma"
+    limit = 60 if is_button else 1000
+    if not value or len(value) > limit:
+        await message.answer(f"Buyruqdan keyin matnni yozing ({limit} belgigacha).")
+        return
+    await db.set_setting(AD_BUTTON if is_button else AD_TEXT, value)
+    await message.answer("✅ Saqlandi. Keyingi reklamada yangi matn chiqadi.")
+
+
+@router.message(Command("reklama_hozir"))
+async def ads_now(message: Message, ads: AdService) -> None:
+    n = await ads.tick(force=True)
+    await message.answer(
+        f"📣 {n} ta guruhga joylandi." if n else
+        "Hech bir guruhga joylanmadi. Bot guruhda admin ekanini tekshiring."
+    )
 
 
 @router.callback_query(F.data == "adm:banhelp")

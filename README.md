@@ -84,6 +84,7 @@ bot/
   middlewares.py # bloklangan foydalanuvchilarni to'xtatish
   voice.py       # ovoz -> matn -> e'lon ma'lumotlari
   group_parser.py # guruh xabarlaridan yo'lovchini ajratish
+  ads.py         # admin bo'lgan guruhlarga muntazam reklama
   handlers/      # common, admin, driver, passenger, offers, voice, group
 tests/           # matching, service va to'liq oqim testlari
 ```
@@ -108,6 +109,21 @@ undan yo'nalish, tuman, sana, vaqt, kishi soni, telefon va username'ni ajratadi 
 2. Botni guruhga qo'shing. Agar bot privacy o'chirilishidan **oldin** qo'shilgan bo'lsa,
    uni guruhdan chiqarib, qayta qo'shing.
 3. Admin panel → **👥 Guruhlar**: qaysi guruhdan nechta yo'lovchi topilgani.
+
+## Guruhlarga avtomatik reklama
+
+Bot **admin** bo'lgan guruhlarga har 10 daqiqada (sozlanadi) reklama joylaydi:
+*«Toshkentdan Farg'onaga va Farg'onadan Toshkentga har kuni yuramiz!»* va
+**«🚕 Joy band qilish»** tugmasi — u botning shaxsiy chatiga olib boradi. U yerda yo'lovchi
+so'rov qoldiradi va bot uni eng yaqin haydovchiga yuboradi.
+
+- Yangi reklamadan oldin eskisi o'chiriladi — guruhda doim bitta reklama turadi.
+- Oxirgi reklamadan beri guruhda yangi xabar bo'lmasa, qayta joylanmaydi.
+- Bot oddiy a'zo bo'lgan guruhlarga reklama joylamaydi (faqat o'qiydi).
+
+Boshqaruv (admin): `/reklama` (holati), `/reklama_on`, `/reklama_off`, `/reklama_vaqt 30`,
+`/reklama_matn <matn>`, `/reklama_tugma <matn>`, `/reklama_hozir`.
+Botni guruhda admin qilganda **«Delete messages»** va **«Post messages»** huquqlari bo'lsin.
 
 ## Ovozli xabar orqali e'lon
 

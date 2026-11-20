@@ -83,6 +83,10 @@ async def on_group_message(message: Message, db: Database, bot: Bot) -> None:
     u = message.from_user
     if u and u.is_bot and u.username != "GroupAnonymousBot":
         return
+    # Guruh faolligi: reklama faqat yangi xabarlar bo'lganda qayta joylanadi
+    await db.upsert_group(message.chat.id, message.chat.title, message.chat.username, True)
+    await db.bump_group_activity(message.chat.id)
+
     raw = message.text or message.caption or ""
     lead = parse(raw)
     short = raw.replace("\n", " ")[:60]
@@ -90,7 +94,6 @@ async def on_group_message(message: Message, db: Database, bot: Bot) -> None:
         log.info("Guruh «%s»: xabar keldi, yo'lovchi e'loni emas: %s", message.chat.title, short)
         return
 
-    await db.upsert_group(message.chat.id, message.chat.title, message.chat.username, True)
     user_id = u.id if u and not u.is_bot else None
     text_hash = hashlib.sha1(normalize(raw).encode()).hexdigest()
     since = (datetime.now(timezone.utc) - timedelta(hours=DUPLICATE_WINDOW_H)).isoformat(timespec="seconds")

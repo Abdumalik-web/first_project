@@ -6,6 +6,7 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
 
+from .ads import AdService
 from .config import load_config
 from .db import Database
 from .handlers import setup_routers
@@ -28,6 +29,8 @@ async def main() -> None:
     dp["db"] = db
     dp["svc"] = svc
     dp["config"] = config
+    ads = AdService(bot, db)
+    dp["ads"] = ads
     dp["voice_parser"] = VoiceParser(config) if config.voice_enabled else None
     if not config.voice_enabled:
         logging.info("Ovozli xabarlar o'chiq (ANTHROPIC_API_KEY va STT_API_KEY kerak).")
@@ -38,11 +41,13 @@ async def main() -> None:
         logging.warning("ADMIN_IDS bo'sh — admin panel hech kimga ochilmaydi. /id bilan ID'ingizni bilib oling.")
 
     housekeeping = asyncio.create_task(svc.run_housekeeping_loop())
+    ads_loop = asyncio.create_task(ads.run_loop())
     try:
         await bot.delete_webhook(drop_pending_updates=False)
         await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
     finally:
         housekeeping.cancel()
+        ads_loop.cancel()
         await db.close()
         await bot.session.close()
 

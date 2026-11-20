@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from aiogram import F, Router
-from aiogram.filters import Command, CommandStart, StateFilter
+from aiogram.filters import Command, CommandObject, CommandStart, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
@@ -21,10 +21,23 @@ router = Router(name="common")
 
 
 @router.message(CommandStart())
-async def start(message: Message, state: FSMContext, db: Database) -> None:
+async def start(message: Message, state: FSMContext, db: Database,
+                command: CommandObject | None = None) -> None:
     await state.clear()
     u = message.from_user
     await db.upsert_user(u.id, u.full_name, u.username)
+    args = (command.args or "") if command else ""
+    if args.startswith("g") and args[1:].isdigit():
+        # Guruhdagi reklama tugmasi orqali kelgan
+        await db.set_user_source(u.id, args[:32])
+        await message.answer(
+            f"Assalomu alaykum, <b>{texts.escape(u.first_name or '')}</b>! 🚕\n\n"
+            "<b>Farg'ona ⇄ Toshkent</b> yo'nalishida sizga eng yaqin haydovchini topamiz.\n\n"
+            "Joy band qilish uchun pastdagi <b>«🧍 Yo'lovchiman»</b> tugmasini bosing.\n"
+            "Haydovchi bo'lsangiz — <b>«🚗 Haydovchiman»</b>.",
+            reply_markup=main_menu(),
+        )
+        return
     await message.answer(
         f"Assalomu alaykum, <b>{texts.escape(u.first_name or '')}</b>!\n\n"
         "Bu bot <b>Farg'ona viloyati ⇄ Toshkent</b> yo'nalishida haydovchi va "

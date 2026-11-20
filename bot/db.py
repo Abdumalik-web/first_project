@@ -70,6 +70,11 @@ CREATE TABLE IF NOT EXISTS groups (
     added_at    TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS settings (
+    key     TEXT PRIMARY KEY,
+    value   TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS group_leads (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     chat_id         INTEGER NOT NULL,
@@ -108,10 +113,17 @@ class Database:
         await self.conn.execute("PRAGMA foreign_keys = ON")
         await self.conn.executescript(SCHEMA)
         # Eski bazalar uchun: yangi ustunlarni qo'shamiz
-        cols = {r["name"] for r in await self.fetchall("PRAGMA table_info(users)")}
-        if "banned" not in cols:
-            await self.conn.execute("ALTER TABLE users ADD COLUMN banned INTEGER NOT NULL DEFAULT 0")
+        await self._ensure_column("users", "banned", "INTEGER NOT NULL DEFAULT 0")
+        await self._ensure_column("users", "source", "TEXT")
+        await self._ensure_column("groups", "last_ad_msg_id", "INTEGER")
+        await self._ensure_column("groups", "last_ad_at", "TEXT")
+        await self._ensure_column("groups", "msgs_since_ad", "INTEGER NOT NULL DEFAULT 1")
         await self.conn.commit()
+
+    async def _ensure_column(self, table: str, column: str, ddl: str) -> None:
+        cols = {r["name"] for r in await self.fetchall(f"PRAGMA table_info({table})")}
+        if column not in cols:
+            await self.conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
 
     async def close(self) -> None:
         if self.conn:
@@ -469,3 +481,43 @@ class Database:
                       (SELECT COUNT(*) FROM group_leads l WHERE l.chat_id=g.id AND l.sent_count>0) AS sent
                FROM groups g ORDER BY g.active DESC, leads DESC"""
         )
+
+    # --- sozlamalar ----------------------------------------------------------
+    async def get_setting(self, key: str, default: str) -> str:
+        row = await self.fetchone("SELECT value FROM settings WHERE key=?", key)
+        return row["value"] if row else default
+
+    async def set_setting(self, key: str, value: str) -> None:
+        await self.execute(
+            "INSERT INTO settings(key, value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+            key, value,
+        )
+
+    # --- guruh reklamasi -----------------------------------------------------
+    async def bump_group_activity(self, chat_id: int) -> None:
+        await self.execute("UPDATE groups SET msgs_since_ad = msgs_since_ad + 1 WHERE id=?", chat_id)
+
+    async def groups_due_for_ad(self, before_iso: str):
+        """Faol, oxirgi reklamadan beri yangi xabar bo'lgan va vaqti kelgan guruhlar."""
+        return await self.fetchall(
+            """SELECT * FROM groups WHERE active=1 AND msgs_since_ad > 0
+               AND (last_ad_at IS NULL OR last_ad_at <= ?)""",
+            before_iso,
+        )
+
+    async def set_group_ad(self, chat_id: int, msg_id: int | None, at_iso: str) -> None:
+        """msg_id None bo'lsa — reklama joylanmadi (admin emas), faqat vaqt yangilanadi."""
+        if msg_id is None:
+            await self.execute("UPDATE groups SET last_ad_at=? WHERE id=?", at_iso, chat_id)
+        else:
+            await self.execute(
+                "UPDATE groups SET last_ad_msg_id=?, last_ad_at=?, msgs_since_ad=0 WHERE id=?",
+                msg_id, at_iso, chat_id,
+            )
+
+    async def set_user_source(self, uid: int, source: str) -> None:
+        await self.execute("UPDATE users SET source=? WHERE id=? AND source IS NULL", source, uid)
+
+    async def count_users_from_ads(self) -> int:
+        row = await self.fetchone("SELECT COUNT(*) FROM users WHERE source LIKE 'g%'")
+        return row[0]
