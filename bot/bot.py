@@ -138,11 +138,20 @@ async def moderate(msg: Message, bot: Bot) -> None:
 
 
 async def main() -> None:
-    if not BOT_TOKEN:
-        raise SystemExit("BOT_TOKEN muhit o'zgaruvchisini o'rnating (.env.example ga qarang)")
+    token = BOT_TOKEN
+    if not token:
+        from getpass import getpass
+
+        # Token ekranda ko'rinmaydi (skrinshotda chiqib qolmasligi uchun)
+        token = getpass("Bot tokenini kiriting (yozganingiz ko'rinmaydi) va Enter bosing: ")
+    token = token.strip().strip('"').strip("'").strip()
+    if not token:
+        raise SystemExit("Token kiritilmadi.")
     from aiogram.client.default import DefaultBotProperties
 
-    bot = Bot(BOT_TOKEN, default=DefaultBotProperties(parse_mode="HTML"))
+    bot = Bot(token, default=DefaultBotProperties(parse_mode="HTML"))
+    me = await bot.get_me()
+    print(f"Bot ishga tushdi: @{me.username}  (to'xtatish uchun Ctrl+C)")
     await dp.start_polling(bot, allowed_updates=["message", "edited_message"])
 
 

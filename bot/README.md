@@ -10,8 +10,11 @@ Adminlar xabarlariga tegmaydi.
 3. O'rnatish va ishga tushirish:
    ```
    pip install -r requirements.txt
-   export BOT_TOKEN=tokeningiz
    python bot.py
+   ```
+   Bot tokenni o'zi so'raydi (yozilgani ekranda ko'rinmaydi).
+   Yoki oldindan bering: Linux `export BOT_TOKEN=...`, PowerShell `$env:BOT_TOKEN="..."`.
+   ```
    ```
 4. Botni guruhga qo'shing va **admin** qiling ("Xabarlarni o'chirish" huquqi bilan).
 
