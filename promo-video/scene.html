@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<style>
+  :root { --y:#FFC400; --y2:#FF9F00; --navy:#0B1530; --blue:#2AABEE; --white:#fff; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html,body { width:1080px; height:1920px; overflow:hidden; background:var(--navy);
+    font-family: Inter, "DejaVu Sans", sans-serif; color:#fff; }
+  #stage { position:relative; width:1080px; height:1920px; overflow:hidden;
+    background: radial-gradient(1200px 900px at 50% 30%, #1d3270 0%, #0B1530 60%, #070d1f 100%); }
+  .abs { position:absolute; }
+  .center { left:50%; transform:translateX(-50%); }
+  .scene { position:absolute; inset:0; opacity:0; }
+  .h1 { font-weight:900; font-size:104px; line-height:1.02; letter-spacing:-2px; text-align:center; }
+  .h2 { font-weight:800; font-size:64px; line-height:1.1; text-align:center; }
+  .yellow { color:var(--y); }
+  .pill { display:inline-block; padding:18px 38px; border-radius:999px; font-weight:800; font-size:44px; }
+  .label { font-weight:800; font-size:52px; text-align:center; width:420px; }
+  #brand { top:70px; left:0; right:0; text-align:center; font-weight:900; font-size:46px; letter-spacing:1px; }
+  #brand .route { display:block; font-weight:600; font-size:32px; opacity:.8; margin-top:6px; letter-spacing:2px; }
+  #subs { left:60px; right:60px; top:1460px; text-align:center; font-weight:800; font-size:56px; line-height:1.25; }
+  #subs span.box { background:rgba(0,0,0,.62); padding:14px 26px; border-radius:22px;
+    -webkit-box-decoration-break:clone; box-decoration-break:clone; }
+  #subs .w { opacity:.55; }
+  #subs .w.on { opacity:1; color:var(--y); }
+  #footer { left:0; right:0; top:1720px; text-align:center; font-size:34px; font-weight:700; opacity:.9; }
+  .card { background:#fff; color:#0B1530; border-radius:36px; box-shadow:0 30px 80px rgba(0,0,0,.45); }
+  .linkrow { display:flex; align-items:center; gap:26px; padding:30px 34px; }
+  .linkrow .t1 { font-size:30px; font-weight:700; color:#5b6680; }
+  .linkrow .t2 { font-size:42px; font-weight:900; color:#0B1530; word-break:break-all; }
+  .ico { width:96px; height:96px; flex:none; border-radius:50%; display:flex; align-items:center; justify-content:center; }
+  #dots div { position:absolute; width:10px; height:10px; border-radius:50%; background:#ffffff; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="dots"></div>
+
+  <!-- road stripes background (scene 3) -->
+  <svg id="road" class="abs" width="1080" height="1920" style="left:0;top:0;opacity:0">
+    <defs>
+      <linearGradient id="roadg" x1="0" x2="0" y1="0" y2="1">
+        <stop offset="0" stop-color="#2b3550"/><stop offset="1" stop-color="#1a2138"/>
+      </linearGradient>
+    </defs>
+    <path id="roadPath" d="M 170 1250 C 300 1020, 820 1120, 870 880 S 620 640, 860 540" stroke="url(#roadg)" stroke-width="120" fill="none" stroke-linecap="round"/>
+    <path id="roadDash" d="M 170 1250 C 300 1020, 820 1120, 870 880 S 620 640, 860 540" stroke="#FFC400" stroke-width="10" fill="none" stroke-dasharray="40 40"/>
+  </svg>
+
+  <!-- ===== SCENE 1: question ===== -->
+  <div class="scene" id="s1">
+    <div class="abs h1" id="s1q1" style="top:300px;left:0;right:0">Haydovchimisiz</div>
+    <div class="abs h2" id="s1or" style="top:430px;left:0;right:0;opacity:.85">yoki</div>
+    <div class="abs h1 yellow" id="s1q2" style="top:520px;left:0;right:0">yo‘lovchimisiz?</div>
+    <div class="abs" id="s1drv" style="left:60px;top:780px;width:460px;height:560px">
+      <div class="card" style="position:absolute;inset:0;background:rgba(255,196,0,.12);border:4px solid var(--y);box-shadow:none"></div>
+      <svg class="abs" style="left:30px;top:80px" width="400" height="260" viewBox="0 0 400 260" id="carA"></svg>
+      <div class="abs label" style="left:20px;top:400px">Haydovchi</div>
+    </div>
+    <div class="abs" id="s1pas" style="left:560px;top:780px;width:460px;height:560px">
+      <div class="card" style="position:absolute;inset:0;background:rgba(42,171,238,.12);border:4px solid var(--blue);box-shadow:none"></div>
+      <svg class="abs" style="left:80px;top:40px" width="300" height="340" viewBox="0 0 300 340" id="paxA"></svg>
+      <div class="abs label" style="left:20px;top:400px">Yo‘lovchi</div>
+    </div>
+  </div>
+
+  <!-- ===== SCENE 2: connect ===== -->
+  <div class="scene" id="s2">
+    <div class="abs h2" style="top:290px;left:40px;right:40px">Haydovchi va yo‘lovchilarni<br><span class="yellow">birlashtiruvchi sahifa</span></div>
+    <svg class="abs" id="s2links" width="1080" height="700" style="left:0;top:560px">
+      <path id="lnL" d="M 230 330 Q 380 170 540 320" stroke="#FFC400" stroke-width="10" fill="none" stroke-linecap="round" stroke-dasharray="14 18"/>
+      <path id="lnR" d="M 850 330 Q 700 170 540 320" stroke="#2AABEE" stroke-width="10" fill="none" stroke-linecap="round" stroke-dasharray="14 18"/>
+    </svg>
+    <div class="abs" id="s2drv" style="left:60px;top:760px;width:340px;text-align:center">
+      <div style="width:300px;height:300px;margin:0 auto;border-radius:50%;background:rgba(255,196,0,.18);border:6px solid var(--y);display:flex;align-items:center;justify-content:center">
+        <svg width="240" height="160" viewBox="0 0 400 260" id="carB"></svg></div>
+      <div class="label" style="width:340px;margin-top:20px;font-size:44px">Haydovchi</div>
+    </div>
+    <div class="abs" id="s2pas" style="left:680px;top:760px;width:340px;text-align:center">
+      <div style="width:300px;height:300px;margin:0 auto;border-radius:50%;background:rgba(42,171,238,.18);border:6px solid var(--blue);display:flex;align-items:center;justify-content:center">
+        <svg width="190" height="215" viewBox="0 0 300 340" id="paxB"></svg></div>
+      <div class="label" style="width:340px;margin-top:20px;font-size:44px">Yo‘lovchi</div>
+    </div>
+    <!-- phone / bot in middle -->
+    <div class="abs" id="s2phone" style="left:390px;top:640px;width:300px;height:560px">
+      <div style="position:absolute;inset:0;border-radius:48px;background:#111a33;border:8px solid #e9edf7;box-shadow:0 30px 70px rgba(0,0,0,.5)"></div>
+      <div style="position:absolute;left:8px;right:8px;top:8px;height:90px;border-radius:40px 40px 0 0;background:var(--blue);display:flex;align-items:center;gap:12px;padding:0 18px">
+        <div style="width:54px;height:54px;border-radius:50%;background:var(--y);display:flex;align-items:center;justify-content:center;font-weight:900;color:#0B1530;font-size:30px">Y</div>
+        <div style="font-weight:800;font-size:24px;line-height:1.1">Yo‘ldamiz<br><span style="font-weight:600;font-size:18px;opacity:.85">bot</span></div>
+      </div>
+      <div class="abs bub" id="b1" style="left:24px;top:120px;max-width:220px;background:#24345e;border-radius:18px;padding:12px 16px;font-size:22px;font-weight:600">Qayerga borasiz?</div>
+      <div class="abs bub" id="b2" style="right:24px;top:210px;max-width:220px;background:var(--y);color:#0B1530;border-radius:18px;padding:12px 16px;font-size:22px;font-weight:800">Farg‘ona → Toshkent</div>
+      <div class="abs bub" id="b3" style="left:24px;top:300px;max-width:250px;white-space:nowrap;background:#24345e;border-radius:18px;padding:12px 16px;font-size:22px;font-weight:600">Haydovchi topildi! ✓</div>
+      <div class="abs bub" id="b4" style="left:24px;right:24px;top:420px;background:#2bb673;border-radius:18px;padding:14px 16px;font-size:24px;font-weight:800;text-align:center">Joy band qilish</div>
+    </div>
+  </div>
+
+  <!-- ===== SCENE 3: ride + discounts ===== -->
+  <div class="scene" id="s3">
+    <div class="abs h2" style="top:260px;left:40px;right:40px">Manzilingizga <span class="yellow">yeting!</span></div>
+    <div class="abs" id="pinF" style="left:70px;top:1146px;text-align:center;width:200px">
+      <svg width="80" height="110" viewBox="0 0 80 110"><path d="M40 4C20 4 6 19 6 38c0 26 34 66 34 66s34-40 34-66C74 19 60 4 40 4z" fill="#FFC400"/><circle cx="40" cy="38" r="13" fill="#0B1530"/></svg>
+      <div style="font-weight:800;font-size:38px">Farg‘ona</div>
+    </div>
+    <div class="abs" id="pinT" style="left:750px;top:386px;text-align:center;width:220px">
+      <div style="font-weight:800;font-size:38px;margin-bottom:6px">Toshkent</div>
+      <svg width="80" height="110" viewBox="0 0 80 110"><path d="M40 4C20 4 6 19 6 38c0 26 34 66 34 66s34-40 34-66C74 19 60 4 40 4z" fill="#2AABEE"/><circle cx="40" cy="38" r="13" fill="#0B1530"/></svg>
+    </div>
+    <svg class="abs" id="carC" width="220" height="143" viewBox="0 0 400 260" style="left:0;top:0"></svg>
+    <!-- badges -->
+    <div class="abs" id="bd1" style="left:60px;top:620px">
+      <div style="width:260px;height:260px;border-radius:50%;background:linear-gradient(135deg,#ff4d6d,#ff8c42);display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 20px 50px rgba(0,0,0,.4)">
+        <div style="font-weight:900;font-size:96px;line-height:1">%</div>
+        <div style="font-weight:800;font-size:38px">Chegirma</div>
+      </div>
+    </div>
+    <div class="abs" id="bd2" style="left:560px;top:930px">
+      <div style="width:250px;height:250px;border-radius:50%;background:linear-gradient(135deg,#2bb673,#1fa2a0);display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 20px 50px rgba(0,0,0,.4)">
+        <svg width="110" height="100" viewBox="0 0 110 100"><rect x="8" y="40" width="94" height="56" rx="8" fill="#fff"/><rect x="2" y="24" width="106" height="24" rx="6" fill="#ffe28a"/><rect x="48" y="24" width="14" height="72" fill="#ff4d6d"/><path d="M55 24 C30 0, 18 22, 55 24 C92 22, 80 0, 55 24z" fill="#ff4d6d"/></svg>
+        <div style="font-weight:800;font-size:38px">Bonuslar</div>
+      </div>
+    </div>
+    <div class="abs" id="bd3" style="left:300px;top:420px">
+      <div class="pill" style="background:#fff;color:#0B1530;font-size:40px">★ Qulay va tez</div>
+    </div>
+  </div>
+
+  <!-- ===== SCENE 4: CTA links ===== -->
+  <div class="scene" id="s4">
+    <div class="abs h2" id="s4t" style="top:250px;left:40px;right:40px">Batafsil — <span style="color:var(--blue)">Telegram</span><br>sahifamizda!</div>
+    <div class="abs card" id="c1" style="left:60px;right:60px;top:520px">
+      <div class="linkrow">
+        <div class="ico" style="background:var(--y)"><svg width="56" height="56" viewBox="0 0 24 24"><rect x="4" y="7" width="16" height="12" rx="3" fill="#0B1530"/><circle cx="9" cy="13" r="1.8" fill="#FFC400"/><circle cx="15" cy="13" r="1.8" fill="#FFC400"/><rect x="11" y="3" width="2" height="4" fill="#0B1530"/><circle cx="12" cy="3" r="1.6" fill="#0B1530"/></svg></div>
+        <div><div class="t1">Bizning bot</div><div class="t2">@yoldamiz_fargona_toshkent_bot</div></div>
+      </div>
+    </div>
+    <div class="abs card" id="c2" style="left:60px;right:60px;top:780px">
+      <div class="linkrow">
+        <div class="ico" style="background:var(--blue)"><svg width="56" height="56" viewBox="0 0 24 24"><path d="M3 11.5 20.5 4.5 17.5 19.5 11.5 15 9.5 19 9 14 17 7.5 7.5 13z" fill="#fff"/></svg></div>
+        <div><div class="t1">Telegram sahifamiz</div><div class="t2">t.me/toshken_fargonaa_taksi</div></div>
+      </div>
+    </div>
+    <div class="abs" id="s4btn" style="left:0;right:0;top:1090px;text-align:center">
+      <div class="pill" style="background:var(--y);color:#0B1530;font-size:54px;padding:28px 60px;box-shadow:0 0 0 0 rgba(255,196,0,.6)" id="btn">Hoziroq qo‘shiling!</div>
+    </div>
+    <div class="abs" style="left:0;right:0;top:1270px;text-align:center;font-size:38px;font-weight:700;opacity:.9">Haydovchilar + Yo‘lovchilar = <span class="yellow">Yo‘ldamiz</span></div>
+  </div>
+
+  <div class="abs" id="brand"><span class="yellow">YO‘LDAMIZ</span> TAKSI<span class="route">FARG‘ONA ⇄ TOSHKENT</span></div>
+  <div class="abs" id="subs"></div>
+  <div class="abs" id="footer">@yoldamiz_fargona_toshkent_bot</div>
+  <div class="abs" id="flash" style="inset:0;background:#fff;opacity:0"></div>
+</div>
+
+<script>
+// ---------- SVG asset builders ----------
+const CAR = `
+  <ellipse cx="200" cy="232" rx="170" ry="14" fill="rgba(0,0,0,.35)"/>
+  <path d="M40 170 L52 120 Q60 98 86 94 L130 90 L168 48 Q178 38 196 38 L282 38 Q300 38 312 52 L348 96 Q376 100 382 124 L388 170 Q388 192 366 192 L62 192 Q40 192 40 170z" fill="#FFC400"/>
+  <path d="M146 92 L178 56 Q184 50 194 50 L236 50 L236 92z" fill="#bfe6ff"/>
+  <path d="M248 50 L282 50 Q292 50 298 58 L328 92 L248 92z" fill="#bfe6ff"/>
+  <rect x="176" y="20" width="60" height="22" rx="5" fill="#0B1530"/><text x="206" y="37" font-size="15" font-weight="900" fill="#FFC400" text-anchor="middle" font-family="Inter">TAXI</text>
+  <rect x="60" y="130" width="320" height="16" fill="#0B1530" opacity=".85"/>
+  <g fill="#FFC400"><rect x="70" y="132" width="12" height="12"/><rect x="94" y="132" width="12" height="12"/><rect x="118" y="132" width="12" height="12"/><rect x="142" y="132" width="12" height="12"/><rect x="166" y="132" width="12" height="12"/><rect x="190" y="132" width="12" height="12"/><rect x="214" y="132" width="12" height="12"/><rect x="238" y="132" width="12" height="12"/><rect x="262" y="132" width="12" height="12"/><rect x="286" y="132" width="12" height="12"/><rect x="310" y="132" width="12" height="12"/><rect x="334" y="132" width="12" height="12"/><rect x="358" y="132" width="12" height="12"/></g>
+  <rect x="368" y="112" width="18" height="12" rx="4" fill="#fff7c2"/>
+  <g class="wheel" data-cx="112" data-cy="192"><circle cx="112" cy="192" r="36" fill="#141a2b"/><circle cx="112" cy="192" r="17" fill="#c9d1e6"/><rect x="108" y="160" width="8" height="64" fill="#141a2b" opacity=".6"/></g>
+  <g class="wheel" data-cx="312" data-cy="192"><circle cx="312" cy="192" r="36" fill="#141a2b"/><circle cx="312" cy="192" r="17" fill="#c9d1e6"/><rect x="308" y="160" width="8" height="64" fill="#141a2b" opacity=".6"/></g>`;
+const PAX = `
+  <ellipse cx="150" cy="326" rx="110" ry="12" fill="rgba(0,0,0,.35)"/>
+  <circle cx="120" cy="70" r="44" fill="#f2c7a0"/>
+  <path d="M76 66 Q80 20 122 22 Q166 24 164 66 Q150 46 120 44 Q92 46 76 66z" fill="#3a2a1e"/>
+  <path d="M60 230 L60 160 Q60 122 100 120 L140 120 Q180 122 180 160 L180 230z" fill="#2AABEE"/>
+  <rect x="74" y="226" width="34" height="96" rx="12" fill="#1c2a4a"/><rect x="132" y="226" width="34" height="96" rx="12" fill="#1c2a4a"/>
+  <path d="M178 150 L214 200" stroke="#f2c7a0" stroke-width="20" stroke-linecap="round"/>
+  <g id="bag"><rect x="190" y="200" width="80" height="110" rx="14" fill="#FFC400"/><rect x="212" y="186" width="36" height="18" rx="6" fill="none" stroke="#FFC400" stroke-width="7"/><rect x="190" y="240" width="80" height="8" fill="#0B1530" opacity=".3"/>
+  <circle cx="206" cy="316" r="7" fill="#0B1530"/><circle cx="254" cy="316" r="7" fill="#0B1530"/></g>
+  <path id="wave" d="M62 150 L28 96" stroke="#f2c7a0" stroke-width="20" stroke-linecap="round"/>`;
+for (const id of ['carA','carB','carC']) document.getElementById(id).innerHTML = CAR;
+for (const id of ['paxA','paxB']) document.getElementById(id).innerHTML = PAX;
+
+// background dots
+const dots = document.getElementById('dots'); const DOTS=[];
+let seed=7; const rnd=()=>{seed=(seed*16807)%2147483647;return seed/2147483647;};
+for (let i=0;i<40;i++){const d=document.createElement('div');dots.appendChild(d);DOTS.push({el:d,x:rnd()*1080,y:rnd()*1920,s:0.3+rnd()*1.2,o:0.05+rnd()*0.18,r:4+rnd()*8});}
+
+// ---------- helpers ----------
+const clamp=(v,a=0,b=1)=>Math.max(a,Math.min(b,v));
+const P=(t,a,b)=>clamp((t-a)/(b-a));
+const eo=x=>1-Math.pow(1-x,3);
+const eio=x=>x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;
+const back=x=>{const c1=1.70158,c3=c1+1;return 1+c3*Math.pow(x-1,3)+c1*Math.pow(x-1,2);};
+const $=id=>document.getElementById(id);
+const sceneAlpha=(t,a,b,f=.3)=>clamp(Math.min(P(t,a,a+f), 1-P(t,b-f,b)));
+
+// subtitle timeline (matches voice offsets in build script)
+const SUBS=[
+  {a:0.20,b:2.91,text:"Haydovchimisiz yoki yo‘lovchimisiz?"},
+  {a:3.10,b:6.68,text:"Botimiz haydovchi va yo‘lovchilarni birlashtiradi."},
+  {a:6.90,b:10.57,text:"Manzilingizga yeting, chegirma va bonuslar oling!"},
+  {a:10.80,b:14.91,text:"Batafsil Telegram sahifamizda. Hoziroq qo‘shiling!"},
+];
+let lastSub=-1;
+function renderSubs(t){
+  let idx=SUBS.findIndex(s=>t>=s.a-0.05&&t<=s.b+0.15);
+  const el=$('subs');
+  if(idx<0){el.style.opacity=0;return;}
+  const s=SUBS[idx];
+  if(idx!==lastSub){el.innerHTML='<span class="box">'+s.text.split(' ').map(w=>`<span class="w">${w}</span>`).join(' ')+'</span>';lastSub=idx;}
+  const ws=el.querySelectorAll('.w');
+  const lens=[...ws].map(w=>w.textContent.length+2); const tot=lens.reduce((a,b)=>a+b,0);
+  const prog=P(t,s.a,s.b)*tot; let acc=0;
+  ws.forEach((w,i)=>{w.classList.toggle('on',prog>acc);acc+=lens[i];});
+  el.style.opacity=clamp(Math.min(P(t,s.a-0.05,s.a+0.1),1-P(t,s.b,s.b+0.15)));
+}
+
+const road=$('roadPath'); const roadLen=road.getTotalLength();
+
+function wheels(svg,ang){svg.querySelectorAll('.wheel').forEach(g=>g.setAttribute('transform',`rotate(${ang} ${g.dataset.cx} ${g.dataset.cy})`));}
+
+// ---------- main render ----------
+window.render=function(t){
+  // background
+  DOTS.forEach(d=>{const y=(d.y - t*60*d.s)%1920; d.el.style.cssText=`left:${d.x}px;top:${(y+1920)%1920}px;width:${d.r}px;height:${d.r}px;opacity:${d.o}`;});
+
+  // brand intro
+  $('brand').style.opacity=P(t,0,.4); $('brand').style.transform=`translateY(${(1-eo(P(t,0,.5)))*-40}px)`;
+
+  // ---- S1 0 - 3.05
+  const a1=sceneAlpha(t,0,3.05,.25); $('s1').style.opacity=a1;
+  const q1=back(P(t,.15,.65)), q2=back(P(t,.9,1.4));
+  $('s1q1').style.transform=`scale(${.4+.6*q1})`; $('s1q1').style.opacity=P(t,.15,.4);
+  $('s1or').style.opacity=.85*P(t,.6,.9);
+  $('s1q2').style.transform=`scale(${.4+.6*q2})`; $('s1q2').style.opacity=P(t,.9,1.15);
+  const dIn=eo(P(t,.3,.9)), pIn=eo(P(t,1.0,1.6));
+  $('s1drv').style.transform=`translateX(${(1-dIn)*-600}px)`;
+  $('s1pas').style.transform=`translateX(${(1-pIn)*600}px)`;
+  // alternating highlight
+  const alt=Math.floor(Math.max(0,t-1.7)/0.45)%2;
+  const pulse=t>1.7?1:0;
+  $('s1drv').style.filter = pulse&&alt===1?'brightness(.55)':'none';
+  $('s1pas').style.filter = pulse&&alt===0?'brightness(.55)':'none';
+  $('s1drv').style.scale = pulse&&alt===0?1.04:1; $('s1pas').style.scale = pulse&&alt===1?1.04:1;
+  $('carA').style.transform=`translateY(${Math.sin(t*14)*3}px)`; wheels($('carA'),t*360);
+  $('paxA').querySelector('#wave').setAttribute('transform',`rotate(${Math.sin(t*9)*14} 62 150)`);
+
+  // ---- S2 3.05 - 6.85
+  const a2=sceneAlpha(t,3.05,6.85,.3); $('s2').style.opacity=a2;
+  const l2=t-3.05;
+  $('s2drv').style.transform=`translateX(${(1-eo(P(l2,0,.6)))*-500}px)`;
+  $('s2pas').style.transform=`translateX(${(1-eo(P(l2,0,.6)))*500}px)`;
+  const ph=back(P(l2,.4,.9)); $('s2phone').style.transform=`scale(${ph}) translateY(${Math.sin(t*3)*6}px)`; $('s2phone').style.opacity=P(l2,.4,.6);
+  ['lnL','lnR'].forEach(id=>{$(id).style.opacity=P(l2,.8,1.1);$(id).style.strokeDashoffset=-t*80;});
+  ['b1','b2','b3','b4'].forEach((id,i)=>{const p=back(P(l2,1.0+i*.55,1.35+i*.55));$(id).style.opacity=P(l2,1.0+i*.55,1.2+i*.55);$(id).style.transform=`scale(${p})`;$(id).style.transformOrigin=i===1?'right top':'left top';});
+  $('b4').style.transform+=` scale(${1+Math.max(0,Math.sin((l2-2.7)*10))*0.05*(l2>2.7?1:0)})`;
+  wheels($('carB'),t*360);
+
+  // ---- S3 6.85 - 10.75
+  const a3=sceneAlpha(t,6.85,10.75,.3); $('s3').style.opacity=a3; $('road').style.opacity=a3;
+  const l3=t-6.85;
+  $('roadDash').style.strokeDashoffset=-t*120;
+  const cp=eio(P(l3,.2,3.6)); const pt=road.getPointAtLength(cp*roadLen); const pt2=road.getPointAtLength(Math.min(roadLen,cp*roadLen+4));
+  let ang=Math.atan2(pt2.y-pt.y,pt2.x-pt.x)*180/Math.PI; let flip=1; if(Math.abs(ang)>90){flip=-1;ang=ang+180;}
+  $('carC').style.transform=`translate(${pt.x-110}px,${pt.y-100}px) rotate(${ang}deg) scaleX(${flip})`; wheels($('carC'),t*720);
+  [['bd1',.9],['bd3',1.5],['bd2',2.1]].forEach(([id,s])=>{const p=back(P(l3,s,s+.45));$(id).style.transform=`scale(${p}) rotate(${(1-p)*-20+Math.sin(t*4+s)*3}deg)`;$(id).style.opacity=P(l3,s,s+.15);});
+  $('pinT').style.transform=`translateY(${Math.sin(t*5)*8}px)`;
+
+  // ---- S4 10.75 - 15
+  const a4=clamp(P(t,10.75,11.05)); $('s4').style.opacity=a4;
+  const l4=t-10.75;
+  $('s4t').style.transform=`translateY(${(1-eo(P(l4,0,.5)))*60}px)`;
+  [['c1',.25],['c2',.6]].forEach(([id,s])=>{const p=eo(P(l4,s,s+.5));$(id).style.transform=`translateX(${(1-p)*(id==='c1'?-1100:1100)}px)`;});
+  const bp=back(P(l4,1.0,1.4)); const pulse4=l4>1.4?(1+Math.sin((l4-1.4)*7)*0.05):1;
+  $('btn').style.transform=`scale(${bp*pulse4})`;
+  $('btn').style.boxShadow=`0 0 0 ${l4>1.4?((l4-1.4)*40)%50:0}px rgba(255,196,0,${l4>1.4?.5-(((l4-1.4)*40)%50)/100:0})`;
+  // highlight link cards
+  $('c1').style.outline = (l4>2.2&&l4<3.2)?'8px solid #FFC400':'none';
+  $('c2').style.outline = (l4>3.2)?'8px solid #2AABEE':'none';
+
+  // footer (hidden in S4 since links are big there)
+  $('footer').style.opacity=.9*clamp(Math.min(P(t,3.3,3.8),1-P(t,10.6,10.9)));
+
+  // flash on transitions
+  const fl=[3.05,6.85,10.75].map(x=>Math.max(0,1-Math.abs(t-x)/0.12)).reduce((a,b)=>Math.max(a,b),0);
+  $('flash').style.opacity=fl*0.35;
+
+  renderSubs(t);
+};
+window.render(0);
+</script>
+</body>
+</html>
