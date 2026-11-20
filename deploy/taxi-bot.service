@@ -1,0 +1,15 @@
+[Unit]
+Description=Farg'ona-Toshkent taksi bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=taxibot
+WorkingDirectory=/opt/taxi-bot
+ExecStart=/opt/taxi-bot/.venv/bin/python -m bot.main
+Restart=always
+RestartSec=5
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

@@ -87,3 +87,34 @@ tests/           # matching, service va to'liq oqim testlari
 ```
 
 Tuman koordinatalari taxminiy (tuman markazlari); aniqroq natija uchun foydalanuvchilar lokatsiya yuborishi tavsiya etiladi.
+
+## Serverga (VPS) joylash — bot 24/7 ishlaydi
+
+Ubuntu 22.04/24.04 VPS kerak. Windows PowerShell'dan:
+
+```powershell
+# 1. Kompyuterdagi botni to'xtating (Ctrl+C) — bitta token bilan ikki joyda ishlab bo'lmaydi
+# 2. Loyihani arxivlang (.env va taxi.db ham ketadi)
+cd $HOME
+tar -czf bot.tgz --exclude=.venv --exclude=.git --exclude=__pycache__ first_project
+# 3. Serverga yuboring va kiring
+scp bot.tgz root@SERVER_IP:/root/
+ssh root@SERVER_IP
+```
+
+Serverda:
+
+```bash
+mkdir -p /opt/taxi-bot && tar -xzf /root/bot.tgz -C /opt/taxi-bot --strip-components=1
+bash /opt/taxi-bot/deploy/setup.sh
+```
+
+Foydali buyruqlar: `journalctl -u taxi-bot -f` (loglar), `systemctl restart taxi-bot`, `systemctl stop taxi-bot`.
+
+**Yangilash:** arxivni `.env` va bazasiz yarating, yuboring va yana `setup.sh` ni ishga tushiring:
+
+```powershell
+tar -czf bot.tgz --exclude=.venv --exclude=.git --exclude=__pycache__ --exclude=.env --exclude=*.db first_project
+scp bot.tgz root@SERVER_IP:/root/
+ssh root@SERVER_IP "tar -xzf /root/bot.tgz -C /opt/taxi-bot --strip-components=1 && bash /opt/taxi-bot/deploy/setup.sh"
+```
