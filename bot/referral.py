@@ -2,7 +2,8 @@
 
 - Har bir foydalanuvchiga shaxsiy havola: botga (t.me/<bot>?start=r<id>) va guruhga
   (bot yaratgan shaxsiy taklif havolasi).
-- Shu havola orqali kelgan **yangi** odam botga ham, guruhga ham qo'shilgach,
+- Shu havola orqali kelgan **yangi** odam botga va guruhga qo'shilib, botdan haqiqatan
+  foydalangach (yo'lovchi sifatida haydovchi topsa yoki haydovchi sifatida odam olsa),
   taklif qilganga ball yoziladi (standart 5).
 - Majburiy guruh belgilangan bo'lsa, guruhga qo'shilmagan odam botdan foydalana olmaydi.
 """
@@ -76,27 +77,51 @@ async def check_member(bot: Bot, db: Database, uid: int, force: bool = False) ->
 
 
 async def maybe_award(bot: Bot, db: Database, uid: int) -> bool:
-    """Taklif qilingan odam botda va guruhda bo'lsa — taklif qilganga bir marta ball."""
+    """Taklif qilganga bir marta ball — taklif qilingan odam:
+      * guruhda (majburiy guruh belgilangan bo'lsa) va
+      * botdan haqiqatan foydalangan bo'lsa: yo'lovchi sifatida haydovchi topgan yoki
+        haydovchi sifatida yo'lovchi olgan (soxta profillar ko'paymasligi uchun).
+    Faqat ro'yxatdan o'tgan bo'lsa — taklif qilganga bir marta «kutilmoqda» xabari boradi.
+    """
     user = await db.get_user(uid)
     if not user or not user["referrer_id"] or user["ref_awarded"]:
         return False
     if await required_group(db) is not None and not user["group_ok"]:
         return False
+    ref = user["referrer_id"]
+    name = escape(user["full_name"] or "foydalanuvchi")
+    pts = await ref_points(db)
+    if not user["activated"]:
+        if await db.mark_ref_notified(uid):
+            try:
+                await bot.send_message(
+                    ref,
+                    f"👥 Siz taklif qilgan <b>{name}</b> botga qo'shildi!\n"
+                    f"💰 U botdan birinchi marta foydalanganda — yo'lovchi sifatida haydovchi topsa "
+                    f"yoki haydovchi sifatida yo'lovchi olsa — sizga <b>{pts} ball</b> yoziladi.",
+                )
+            except TelegramAPIError:
+                pass
+        return False
     if not await db.mark_ref_awarded(uid):
         return False
-    pts = await ref_points(db)
-    ref = user["referrer_id"]
     await db.add_bonus(ref, pts, "invite", note=user["full_name"] or str(uid))
     balance = await db.bonus_balance(ref)
     try:
         await bot.send_message(
             ref,
-            f"👥 Siz taklif qilgan <b>{escape(user['full_name'] or 'foydalanuvchi')}</b> botga va "
-            f"guruhga qo'shildi!\n💰 <b>+{pts} ball</b>. Jami: <b>{balance} ball</b>.",
+            f"🎉 Siz taklif qilgan <b>{name}</b> botdan foydalandi!\n"
+            f"💰 <b>+{pts} ball</b>. Jami: <b>{balance} ball</b>.",
         )
     except TelegramAPIError:
         pass
     return True
+
+
+async def activate(bot: Bot, db: Database, uid: int) -> None:
+    """Foydalanuvchi botdan haqiqatan foydalandi — taklif ballini tekshirish."""
+    await db.set_activated(uid)
+    await maybe_award(bot, db, uid)
 
 
 async def personal_group_link(bot: Bot, db: Database, uid: int) -> str | None:
@@ -141,11 +166,13 @@ async def invite_text(bot: Bot, db: Database, uid: int) -> tuple[str, InlineKeyb
     invited, awarded = await db.referral_stats(uid)
     text = (
         "👥 <b>Do'stlaringizni taklif qiling va ball yig'ing!</b>\n\n"
-        f"Sizning havolangiz orqali qo'shilgan har bir yangi odam uchun — <b>{pts} ball</b> "
-        "(u botga ham, guruhga ham qo'shilgach).\n\n"
+        f"Sizning havolangiz orqali qo'shilgan har bir yangi odam uchun — <b>{pts} ball</b>.\n"
+        "Ball u botga va guruhga qo'shilib, botdan <b>birinchi marta foydalanganda</b> yoziladi: "
+        "yo'lovchi sifatida haydovchi topsa yoki haydovchi sifatida yo'lovchi olsa.\n\n"
         f"🤖 Botga shaxsiy havolangiz:\n{bot_link}\n\n"
         f"👥 Guruhga havola:\n{escape(grp)}\n\n"
-        f"📊 Siz taklif qilganlar: <b>{invited}</b>, shundan ball berilgani: <b>{awarded}</b>\n"
+        f"📊 Siz taklif qilganlar: <b>{invited}</b>, ball berilgani: <b>{awarded}</b>, "
+        f"foydalanishi kutilmoqda: <b>{invited - awarded}</b>\n"
         f"💰 Balansingiz: <b>{await db.bonus_balance(uid)} ball</b>"
     )
     share = ("https://t.me/share/url?url=" + quote(bot_link) + "&text="

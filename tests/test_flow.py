@@ -651,29 +651,63 @@ async def test_referral_and_group_gate(app):
     assert "guruhimizga qo'shiling" in bot.texts_to(N)[-1]  # botdan foydalana olmaydi
     await click(bot, dp, N, f"gate:r{R}")                  # hali qo'shilmagan
     assert await db.bonus_balance(R) == 0
-    # N guruhga qo'shildi va «Qo'shildim» bosdi -> R ga 5 ball
+    # N guruhga qo'shildi va «Qo'shildim» bosdi -> hali ball YO'Q, faqat «kutilmoqda» xabari
     bot.members[G].add(N)
     await click(bot, dp, N, f"gate:r{R}")
     assert "Kimsiz?" in bot.texts_to(N)[-1]
-    assert await db.bonus_balance(R) == 5
-    assert any("+5 ball" in t for t in bot.texts_to(R))
+    assert await db.bonus_balance(R) == 0
+    assert any("botga qo'shildi!" in t and "birinchi marta foydalanganda" in t for t in bot.texts_to(R))
     await send(bot, dp, N, "🧍 Yo'lovchiman")              # endi ishlaydi
     assert "Qayerga borasiz" in bot.texts_to(N)[-1]
     await send(bot, dp, N, "❌ Bekor qilish")
-    await send(bot, dp, N, f"/start r{R}")                 # qayta — ikkinchi marta ball yo'q
+    await send(bot, dp, N, f"/start r{R}")                 # qayta — xabar ham, ball ham takrorlanmaydi
+    assert sum("botga qo'shildi!" in t for t in bot.texts_to(R)) == 1
+    assert await db.bonus_balance(R) == 0
+
+    # N yo'lovchi sifatida haydovchi topdi -> R ga 5 ball
+    svc = dp["svc"]
+    D = 1205
+    bot.members[G].add(D)
+    await db.upsert_user(D, "Haydovchi D", None)
+    await db.set_phone(D, "+998905550000")
+    await db.set_phone(N, "+998905551111")
+    tomorrow = (today() + timedelta(days=1)).isoformat()
+    await db.create_trip(D, "F2T", ["qoqon"], tomorrow, "morning", 4, None, None, None, None)
+    rid = await db.create_request(N, "F2T", "qoqon", "chilonzor", None, None, tomorrow, "morning", 1, None)
+    await svc.dispatch_request(rid)
+    await click(bot, dp, D, bot.last_kb(D).inline_keyboard[0][0].callback_data)
     assert await db.bonus_balance(R) == 5
+    assert any("botdan foydalandi" in t and "+5 ball" in t for t in bot.texts_to(R))
 
     # E — eski foydalanuvchi: havola bilan kirsa ham ball berilmaydi
     await send(bot, dp, E, f"/start r{R}")
     assert await db.bonus_balance(R) == 5
 
-    # M — avval R ning shaxsiy GURUH havolasi bilan guruhga kirdi, keyin botga
+    # M — avval R ning shaxsiy GURUH havolasi bilan guruhga kirdi, keyin botga; hali ball yo'q
     bot.members[G].add(M)
     await member_event(bot, dp, G, M, joined=True, link=personal)
     await send(bot, dp, M, "/start")
+    assert await db.bonus_balance(R) == 5
+    # M haydovchi sifatida yo'lovchi oldi -> R ga yana 5 ball
+    P = 1206
+    bot.members[G].add(P)
+    await db.upsert_user(P, "Yo'lovchi P", None)
+    await db.set_phone(P, "+998905552222")
+    await db.set_phone(M, "+998905553333")
+    await db.create_trip(M, "T2F", ["quva"], tomorrow, "day", 4, None, None, None, None)
+    rid2 = await db.create_request(P, "T2F", "quva", "yunusobod", None, None, tomorrow, "day", 1, None)
+    await svc.dispatch_request(rid2)
+    await click(bot, dp, M, bot.last_kb(M).inline_keyboard[0][0].callback_data)
     assert await db.bonus_balance(R) == 10
     invited, awarded = await db.referral_stats(R)
     assert (invited, awarded) == (2, 2)
+
+    # Soxta profil: qo'shildi, lekin hech qachon foydalanmadi -> ball yo'q
+    F = 1207
+    bot.members[G].add(F)
+    await send(bot, dp, F, f"/start r{R}")
+    assert await db.bonus_balance(R) == 10
+    assert await db.referral_stats(R) == (3, 2)
 
     # N guruhdan chiqdi -> botdan foydalana olmaydi
     bot.members[G].discard(N)

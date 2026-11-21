@@ -18,7 +18,7 @@ HELP = (
     "📤 <b>Yo'lovchi uzatish</b>: o'zingiz olib keta olmaydigan yo'lovchini botga kiriting — "
     "boshqa haydovchi olsa, sizga <b>bonus ball</b> yoziladi («💰 Bonusim»).\n\n"
     "👥 <b>Do'stlarni taklif qilish</b>: shaxsiy havolangiz orqali qo'shilgan har bir yangi "
-    "odam uchun ball olasiz.\n\n"
+    "odam botdan birinchi marta foydalanganda ball olasiz.\n\n"
     "Buyruqlar: /start — bosh menyu, /cancel — joriy amalni bekor qilish."
 )
 

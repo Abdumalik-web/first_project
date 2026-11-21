@@ -182,9 +182,10 @@ ball yechiladi, foydalanuvchiga xabar boradi), `/bonus_qosh <id> <ball>`, `/bonu
 
 - **«👥 Do'stlarni taklif qilish»** — har bir foydalanuvchiga shaxsiy havolalar: botga
   (`t.me/<bot>?start=r<id>`) va guruhga (bot yaratgan shaxsiy taklif havolasi) hamda «Ulashish» tugmasi.
-- Shu havolalar orqali kelgan **yangi** odam botga ham, guruhga ham qo'shilgach, taklif qilganga
-  **5 ball** (`/taklif_ball` bilan o'zgaradi). Bir odam uchun bir marta; botda oldin bo'lgan odam
-  hisoblanmaydi.
+- Shu havolalar orqali kelgan **yangi** odam botga va guruhga qo'shilib, botdan **haqiqatan
+  foydalangach** — yo'lovchi sifatida haydovchi topsa yoki haydovchi sifatida yo'lovchi olsa —
+  taklif qilganga **5 ball** (`/taklif_ball` bilan o'zgaradi). Soxta profillar uchun ball yo'q.
+  Bir odam uchun bir marta; botda oldin bo'lgan odam hisoblanmaydi.
 - **Majburiy guruh** (`/majburiy_guruh <id>`): guruhga qo'shilmagan odam botdan foydalana olmaydi —
   bot «👥 Guruhga qo'shilish» va «✅ Qo'shildim» tugmalarini ko'rsatadi. Guruhdan chiqsa — yana
   to'xtatiladi. Adminlar tekshirilmaydi. `/majburiy_guruh off` — o'chirish.

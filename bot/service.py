@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 from aiogram import Bot
 from aiogram.exceptions import TelegramAPIError
 
-from . import bonus, texts
+from . import bonus, referral, texts
 from .config import Config
 from .db import Database
 from .keyboards import offer_kb
@@ -128,6 +128,10 @@ class MatchService:
 
         trip = await self.db.get_trip(trip["id"])
         driver = await self.db.get_user(trip["driver_id"])
+        # Botdan haqiqatan foydalanishdi — taklif qilganlarga ball (bo'lsa)
+        await referral.activate(self.bot, self.db, trip["driver_id"])
+        if not req["ext_phone"]:
+            await referral.activate(self.bot, self.db, req["passenger_id"])
         if req["ext_phone"]:
             await self._accept_referral(req, trip, driver)
         else:

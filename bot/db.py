@@ -153,6 +153,9 @@ class Database:
         await self._ensure_column("users", "ref_awarded", "INTEGER NOT NULL DEFAULT 0")
         await self._ensure_column("users", "group_ok", "INTEGER NOT NULL DEFAULT 0")
         await self._ensure_column("users", "group_checked_at", "TEXT")
+        # Botdan haqiqatan foydalandi: yo'lovchi sifatida haydovchi topdi yoki haydovchi sifatida odam oldi
+        await self._ensure_column("users", "activated", "INTEGER NOT NULL DEFAULT 0")
+        await self._ensure_column("users", "ref_notified", "INTEGER NOT NULL DEFAULT 0")
         # Haydovchi uzatgan (botda bo'lmagan) yo'lovchi: passenger_id — uzatgan haydovchi
         await self._ensure_column("requests", "ext_name", "TEXT")
         await self._ensure_column("requests", "ext_phone", "TEXT")
@@ -765,3 +768,12 @@ class Database:
             await self.execute("DELETE FROM pending_refs WHERE user_id=?", uid)
             return row["referrer_id"]
         return None
+
+    async def set_activated(self, uid: int) -> bool:
+        """Birinchi marta faollashsa True."""
+        n = await self._exec_count("UPDATE users SET activated=1 WHERE id=? AND activated=0", uid)
+        return n == 1
+
+    async def mark_ref_notified(self, uid: int) -> bool:
+        n = await self._exec_count("UPDATE users SET ref_notified=1 WHERE id=? AND ref_notified=0", uid)
+        return n == 1
