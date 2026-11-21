@@ -219,7 +219,7 @@ const road=$('roadPath'); const roadLen=road.getTotalLength();
 function wheels(svg,ang){svg.querySelectorAll('.wheel').forEach(g=>g.setAttribute('transform',`rotate(${ang} ${g.dataset.cx} ${g.dataset.cy})`));}
 
 // ---------- main render ----------
-window.render=function(t){
+window.render=function(t, rt){
   // background
   DOTS.forEach(d=>{const y=(d.y - t*60*d.s)%1920; d.el.style.cssText=`left:${d.x}px;top:${(y+1920)%1920}px;width:${d.r}px;height:${d.r}px;opacity:${d.o}`;});
 
@@ -284,7 +284,7 @@ window.render=function(t){
   const fl=[3.05,6.85,10.75].map(x=>Math.max(0,1-Math.abs(t-x)/0.12)).reduce((a,b)=>Math.max(a,b),0);
   $('flash').style.opacity=fl*0.35;
 
-  renderSubs(t);
+  renderSubs(rt===undefined?t:rt);
 };
 window.render(0);
 </script>

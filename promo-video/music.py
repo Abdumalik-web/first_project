@@ -1,6 +1,7 @@
 # Synthesizes a simple upbeat background track (15s) + transition whooshes -> build/music.wav
 import numpy as np, wave
-SR=44100; DUR=15.0; N=int(SR*DUR); t=np.arange(N)/SR
+import os, json
+SR=44100; DUR=json.load(open('build/timeline.json'))['dur'] if os.path.exists('build/timeline.json') else 15.0; N=int(SR*DUR); t=np.arange(N)/SR
 out=np.zeros(N)
 bpm=112; beat=60/bpm
 def note(f): return 440*2**((f-69)/12)
@@ -32,7 +33,7 @@ while k*beat<DUR:
         L2=min(N-hs,int(0.05*SR)); out[hs:hs+L2]+=0.04*rng.standard_normal(L2)*np.exp(-np.arange(L2)/SR*80)
     k+=1
 # whooshes at scene changes
-for c in [3.05,6.85,10.75]:
+for c in (json.load(open('build/timeline.json'))['real'][1:4] if os.path.exists('build/timeline.json') else [3.05,6.85,10.75]):
     s=int((c-0.35)*SR); L=int(0.5*SR); tb=np.arange(L)/SR
     n=rng.standard_normal(L); n=np.convolve(n,np.ones(8)/8,'same')
     env=np.sin(np.pi*tb/0.5)**2

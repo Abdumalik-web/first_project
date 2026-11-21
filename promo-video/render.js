@@ -3,25 +3,30 @@
 const { chromium } = require('playwright');
 const { spawn } = require('child_process');
 const path = require('path');
-const FPS = 30, DUR = 15;
+const fs = require('fs');
+const TL = fs.existsSync(path.join(__dirname,'build/timeline.json')) ? JSON.parse(fs.readFileSync(path.join(__dirname,'build/timeline.json'),'utf8')) : null;
+const FPS = 30, DUR = TL ? TL.dur : 15;
+// piecewise-linear map from real video time to the animation's designed 15s timeline
+function warp(t){ if(!TL) return t; const r=TL.real,o=TL.orig; for(let i=0;i<r.length-1;i++){ if(t<=r[i+1]||i===r.length-2){ return o[i]+(t-r[i])*(o[i+1]-o[i])/(r[i+1]-r[i]); } } return t; }
 (async () => {
   const mode = process.argv[2] || 'preview';
   const browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width: 1080, height: 1920 }, deviceScaleFactor: 1 });
-  const fs = require('fs'); const sj = path.join(__dirname, 'build/subs.json');
-  if (fs.existsSync(sj)) await page.addInitScript(s => { window.SUBS_OVERRIDE = s; }, JSON.parse(fs.readFileSync(sj, 'utf8')));
+  const sj = path.join(__dirname, 'build/subs.json');
+  const subs = TL ? TL.subs : (fs.existsSync(sj) ? JSON.parse(fs.readFileSync(sj, 'utf8')) : null);
+  if (subs) await page.addInitScript(s => { window.SUBS_OVERRIDE = s; }, subs);
   await page.goto('file://' + path.join(__dirname, 'scene.html'));
   await page.evaluate(() => document.fonts.ready);
   if (mode === 'preview') {
     for (const t of (process.argv[3] || '1.2,2.6,5.6,9.5,13.5').split(',').map(Number)) {
-      await page.evaluate(t => render(t), t);
+      await page.evaluate(([w, t]) => render(w, t), [warp(t), t]);
       await page.screenshot({ path: `build/prev_${t}.png` });
     }
   } else {
     const ff = spawn('ffmpeg', ['-y', '-f', 'image2pipe', '-framerate', String(FPS), '-c:v', 'mjpeg', '-i', '-',
       '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-preset', 'medium', '-crf', '18', 'build/video.mp4'], { stdio: ['pipe', 'ignore', 'inherit'] });
     for (let f = 0; f < FPS * DUR; f++) {
-      await page.evaluate(t => render(t), f / FPS);
+      await page.evaluate(([w, t]) => render(w, t), [warp(f / FPS), f / FPS]);
       const buf = await page.screenshot({ type: 'jpeg', quality: 95 });
       if (!ff.stdin.write(buf)) await new Promise(r => ff.stdin.once('drain', r));
     }
