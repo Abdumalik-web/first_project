@@ -14,6 +14,8 @@ BTN_DRIVER = "🚗 Haydovchiman"
 BTN_PASSENGER = "🧍 Yo'lovchiman"
 BTN_MY = "📋 Mening e'lonlarim"
 BTN_HELP = "ℹ️ Yordam"
+BTN_HANDOVER = "📤 Yo'lovchi uzatish"
+BTN_BONUS = "💰 Bonusim"
 BTN_LOCATION = "📍 Joylashuvni yangilash"
 BTN_CANCEL = "❌ Bekor qilish"
 BTN_SKIP = "⏭ O'tkazib yuborish"
@@ -25,6 +27,7 @@ def main_menu() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text=BTN_DRIVER), KeyboardButton(text=BTN_PASSENGER)],
+            [KeyboardButton(text=BTN_HANDOVER), KeyboardButton(text=BTN_BONUS)],
             [KeyboardButton(text=BTN_MY), KeyboardButton(text=BTN_HELP)],
             [KeyboardButton(text=BTN_LOCATION, request_location=True)],
         ],
@@ -152,6 +155,7 @@ def trip_manage_kb(trip_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="👥 Yo'lovchilarim", callback_data=f"tm:pax:{trip_id}")],
+            [InlineKeyboardButton(text="✅ To'ldim (joy qolmadi)", callback_data=f"tm:full:{trip_id}")],
             [InlineKeyboardButton(text="📢 Guruhlarga joylash: yoqish / o'chirish",
                                   callback_data=f"tm:pub:{trip_id}")],
             [

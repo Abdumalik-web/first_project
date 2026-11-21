@@ -5,10 +5,11 @@ from aiogram.filters import Command, CommandObject, CommandStart, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
-from .. import texts
+from .. import bonus, texts
 from ..db import Database
 from ..regions import DIRECTIONS
 from ..keyboards import (
+    BTN_BONUS,
     cancel_kb,
     BTN_CANCEL,
     BTN_HELP,
@@ -66,6 +67,13 @@ async def start(message: Message, state: FSMContext, db: Database,
 @router.message(F.text == BTN_HELP)
 async def help_(message: Message) -> None:
     await message.answer(texts.HELP, reply_markup=main_menu())
+
+
+@router.message(StateFilter(None), F.text == BTN_BONUS)
+@router.message(Command("bonus"))
+async def my_bonus(message: Message, db: Database) -> None:
+    await message.answer(await bonus.explain_text(db, message.from_user.id),
+                         reply_markup=bonus.handover_kb())
 
 
 @router.message(Command("id"))
@@ -141,6 +149,14 @@ async def trip_manage(cb: CallbackQuery, db: Database, svc: MatchService) -> Non
             )
         await cb.message.answer("\n".join(lines))
         await cb.answer()
+        return
+    if action == "full":
+        if trip["status"] != "active":
+            await cb.answer("E'lon allaqachon yopilgan", show_alert=True)
+            return
+        await db.set_trip_full(trip_id)
+        await cb.answer("✅ Belgilandi: joy qolmadi")
+        await svc.notify_full(trip)
         return
     if action == "pub":
         on = await db.toggle_trip_publish(trip_id)

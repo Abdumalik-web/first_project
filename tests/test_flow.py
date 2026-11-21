@@ -65,8 +65,8 @@ async def app(tmp_path):
     yield bot, dp, db
     await db.close()
     # Modul darajasidagi routerlarni keyingi test uchun ajratamiz
-    from bot.handlers import admin, common, driver, group, offers, passenger, voice
-    for m in (admin, common, driver, group, offers, passenger, voice):
+    from bot.handlers import admin, common, driver, group, handover, offers, passenger, voice
+    for m in (admin, common, driver, group, handover, offers, passenger, voice):
         m.router._parent_router = None
 
 
@@ -521,3 +521,75 @@ async def test_admin_users_list(app):
     content = doc.document.data.decode("utf-8-sig")
     assert content.count("\n") == 22  # sarlavha + 21 qator
     assert "Odam 1;@odam1;+998901112233;1;0" in content
+
+
+# --- Yo'lovchi uzatish va bonus ----------------------------------------------
+async def test_handover_bonus_flow(app):
+    bot, dp, db = app
+    ADMIN, A, B = 900, 1101, 1102  # A — Toshkentdagi haydovchi (uzatadi), B — Qo'qondagi haydovchi
+    tomorrow = (today() + timedelta(days=1)).isoformat()
+    for u in (ADMIN, A, B):
+        await send(bot, dp, u, "/start")
+    await db.set_phone(A, "+998901110000")
+    await db.set_phone(B, "+998902220000")
+    t_b = await db.create_trip(B, "F2T", ["qoqon"], tomorrow, "morning", 2, "Nexia", None, None, None)
+
+    async def handover(phone, name="Akmal aka"):
+        await send(bot, dp, A, "📤 Yo'lovchi uzatish")
+        for d in ("ho:dir:F2T", "ho:fd:qoqon", "ho:td:chilonzor", f"ho:date:{tomorrow}",
+                  "ho:slot:morning", "ho:seats:2"):
+            await click(bot, dp, A, d)
+        await send(bot, dp, A, phone)
+
+    # 1) A begona yo'lovchini uzatadi
+    await handover("90 333 44 55")
+    await send(bot, dp, A, "Akmal aka, yuki bor")
+    assert "+998903334455" in bot.texts_to(A)[-1]
+    await click(bot, dp, A, "ho:ok")
+    assert "uzatildi" in bot.texts_to(A)[-1] and "20 ball" in bot.texts_to(A)[-1]
+
+    # 2) B ga taklif keladi — kim uzatgani aytiladi, raqam hali ko'rinmaydi
+    offer = bot.texts_to(B)[-1]
+    assert "boshqa haydovchi uzatgan" in offer and "+998903334455" not in offer
+    await click(bot, dp, B, bot.last_kb(B).inline_keyboard[0][0].callback_data)
+    out_b = bot.texts_to(B)
+    assert any("+998903334455" in t and "Akmal aka" in t for t in out_b)
+    # Mashina to'ldi (2 o'rin) — oq yo'l va bonus taklifi avtomatik
+    assert any("oq yo'l" in t for t in out_b)
+    # A ga bonus
+    assert any("+20 ball" in t and "+998902220000" in t for t in bot.texts_to(A))
+    assert await db.bonus_balance(A) == 20
+
+    # 3) Shu raqamni shu kunga qayta uzatib bo'lmaydi
+    await handover("+998903334455")
+    assert "allaqachon" in bot.texts_to(A)[-1]
+    await send(bot, dp, A, "❌ Bekor qilish")
+
+    # 4) «💰 Bonusim»
+    await send(bot, dp, A, "💰 Bonusim")
+    assert "Bonus ballaringiz: 20" in bot.texts_to(A)[-1]
+
+    # 5) B «To'ldim» ni qo'lda bosadi (yangi e'lon bilan)
+    t_b2 = await db.create_trip(B, "T2F", ["quva"], tomorrow, "evening", 4, None, None, None, None)
+    n = len(bot.texts_to(B))
+    await click(bot, dp, B, f"tm:full:{t_b2}")
+    assert (await db.get_trip(t_b2))["seats_free"] == 0
+    assert len(bot.texts_to(B)) == n + 1 and "oq yo'l" in bot.texts_to(B)[-1]
+
+    # 6) B birinchi e'lonni bekor qilsa — A ning bonusi qaytarib olinadi
+    await click(bot, dp, B, f"tm:cancel:{t_b}")
+    assert await db.bonus_balance(A) == 0
+    assert any("qaytarib olindi" in t for t in bot.texts_to(A))
+
+    # 7) Admin: qo'shish, to'lash, ko'rish
+    await send(bot, dp, ADMIN, f"/bonus_qosh {A} 50 sinov")
+    await send(bot, dp, ADMIN, f"/bonus_tolash {A} 100")
+    assert "faqat 50 ball" in bot.texts_to(ADMIN)[-1]
+    await send(bot, dp, ADMIN, f"/bonus_tolash {A} 30 karta")
+    assert await db.bonus_balance(A) == 20
+    assert any("30 ball pulga aylantirildi" in t for t in bot.texts_to(A))
+    await send(bot, dp, ADMIN, "/bonus_ball 15")
+    await send(bot, dp, ADMIN, "/bonus_info 1 ball = 1000 so'm")
+    await click(bot, dp, ADMIN, "adm:bonus")
+    txt = bot.texts_to(ADMIN)[-1]
+    assert "15 ball / kishi" in txt and "1000 so'm" in txt and str(A) in txt

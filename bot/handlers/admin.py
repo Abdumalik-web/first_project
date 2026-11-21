@@ -22,7 +22,7 @@ from aiogram.types import (
     TelegramObject,
 )
 
-from .. import texts
+from .. import bonus, texts
 from ..ads import K_ACTIVITY as AD_ACTIVITY, K_ENABLED as AD_ENABLED, K_INTERVAL as AD_INTERVAL
 from ..ads import K_TRIPS_ENABLED, K_TRIPS_INTERVAL, MIN_INTERVAL_MIN, AdService, ad_settings, k_button, k_text
 from ..config import Config
@@ -61,7 +61,8 @@ def admin_kb() -> InlineKeyboardMarkup:
              b(text="🧍 Kutayotgan so'rovlar", callback_data="adm:reqs")],
             [b(text="👥 Guruhlar", callback_data="adm:groups"),
              b(text="📣 Guruh reklamasi", callback_data="adm:ads")],
-            [b(text="📢 Hammaga xabar yuborish", callback_data="adm:bc")],
+            [b(text="💰 Bonuslar", callback_data="adm:bonus"),
+             b(text="📢 Hammaga xabar yuborish", callback_data="adm:bc")],
             [b(text="🚫 Bloklash bo'yicha yordam", callback_data="adm:banhelp")],
         ]
     )
@@ -79,7 +80,8 @@ ADMIN_HELP = (
     "/del_req <i>raqam</i> — so'rovni o'chirish\n"
     "/tekshir <i>matn</i> — guruh xabarini bot qanday tushunishini ko'rish\n"
     "/reklama — guruh reklamasi, /elon — haydovchi e'lonlarini guruhlarga joylash\n"
-    "/guruh_link — haydovchi va yo'lovchilarga bir marta yuboriladigan guruh havolasi"
+    "/guruh_link — haydovchi va yo'lovchilarga bir marta yuboriladigan guruh havolasi\n"
+    "/bonuslar — bonus ballar, to'lovlar va sozlamalar"
 )
 
 
@@ -324,6 +326,101 @@ async def group_link(message: Message, command: CommandObject, db: Database) -> 
         return
     await db.set_setting(texts.GROUP_LINK_KEY, arg)
     await message.answer(f"✅ Saqlandi: {escape(arg)}", disable_web_page_preview=True)
+
+
+# --- bonus ballar -------------------------------------------------------------
+async def _bonus_admin_text(db: Database) -> str:
+    pts = await bonus.per_seat(db)
+    info = await bonus.info_text(db)
+    lines = [
+        "💰 <b>Bonus ballar</b>\n",
+        f"Uzatilgan yo'lovchini boshqa haydovchi olsa: <b>{pts} ball / kishi</b>",
+        f"Foydalanuvchilarga ko'rinadigan shart: <i>{escape(info)}</i>\n",
+        "<b>Eng ko'p ball yig'ganlar:</b>",
+    ]
+    top = await db.bonus_top(20)
+    for i, r in enumerate(top, 1):
+        name = escape(r["full_name"] or str(r["user_id"]))
+        uname = f" @{escape(r['username'])}" if r["username"] else ""
+        phone = f" {escape(r['phone'])}" if r["phone"] else ""
+        lines.append(f"{i}. {name}{uname}{phone} — <b>{r['balance']}</b> ball "
+                     f"({r['referrals']} ta uzatish), id <code>{r['user_id']}</code>")
+    if not top:
+        lines.append("Hali hech kim ball yig'magan.")
+    lines += [
+        "",
+        "/bonus_tolash <i>id ball [izoh]</i> — pul to'lab berildi, ballni yechish",
+        "/bonus_qosh <i>id ball [izoh]</i> — qo'lda ball qo'shish (manfiy ham bo'ladi)",
+        "/bonus_ball <i>son</i> — 1 kishi uchun necha ball",
+        "/bonus_info <i>matn</i> — pulga aylantirish sharti (masalan: «1 ball = 1000 so'm, 100 balldan»)",
+    ]
+    return "\n".join(lines)
+
+
+@router.callback_query(F.data == "adm:bonus")
+async def bonus_menu(cb: CallbackQuery, db: Database) -> None:
+    await cb.message.answer(await _bonus_admin_text(db))
+    await cb.answer()
+
+
+@router.message(Command("bonuslar"))
+async def bonus_cmd(message: Message, db: Database) -> None:
+    await message.answer(await _bonus_admin_text(db))
+
+
+@router.message(Command("bonus_ball"))
+async def bonus_per_seat(message: Message, command: CommandObject, db: Database) -> None:
+    arg = (command.args or "").strip()
+    if not arg.isdigit() or int(arg) < 1:
+        await message.answer("Masalan: <code>/bonus_ball 10</code>")
+        return
+    await db.set_setting(bonus.K_PER_SEAT, arg)
+    await message.answer(f"✅ Endi har bir uzatilgan kishi uchun {arg} ball.")
+
+
+@router.message(Command("bonus_info"))
+async def bonus_info(message: Message, db: Database) -> None:
+    parts = (message.text or "").split(maxsplit=1)
+    value = parts[1].strip() if len(parts) > 1 else ""
+    if not value or len(value) > 500:
+        await message.answer("Masalan: <code>/bonus_info 1 ball = 1000 so'm. 100 balldan boshlab "
+                             "admin orqali kartangizga o'tkaziladi.</code>")
+        return
+    await db.set_setting(bonus.K_INFO, value)
+    await message.answer("✅ Saqlandi.")
+
+
+@router.message(Command("bonus_tolash", "bonus_qosh"))
+async def bonus_change(message: Message, command: CommandObject, db: Database, bot: Bot) -> None:
+    parts = (command.args or "").split(maxsplit=2)
+    payout = command.command == "bonus_tolash"
+    try:
+        uid, points = int(parts[0]), int(parts[1])
+    except (IndexError, ValueError):
+        await message.answer(f"Masalan: <code>/{command.command} 123456789 100 karta orqali</code>")
+        return
+    note = parts[2] if len(parts) > 2 else None
+    if not await db.get_user(uid):
+        await message.answer("Bunday foydalanuvchi yo'q.")
+        return
+    if payout:
+        points = abs(points)
+        balance = await db.bonus_balance(uid)
+        if points > balance:
+            await message.answer(f"Balansda faqat {balance} ball bor.")
+            return
+        await db.add_bonus(uid, -points, "payout", note=note)
+        user_msg = f"💸 {points} ball pulga aylantirildi." + (f" ({escape(note)})" if note else "")
+    else:
+        await db.add_bonus(uid, points, "manual", note=note)
+        sign = "+" if points > 0 else ""
+        user_msg = f"💰 Admin tomonidan {sign}{points} ball." + (f" ({escape(note)})" if note else "")
+    balance = await db.bonus_balance(uid)
+    try:
+        await bot.send_message(uid, f"{user_msg}\nJoriy balans: <b>{balance} ball</b>.")
+    except TelegramAPIError:
+        pass
+    await message.answer(f"✅ Bajarildi. {uid} balansi: {balance} ball.")
 
 
 @router.message(Command("reklama_hozir"))

@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 from aiogram import Bot
 from aiogram.exceptions import TelegramAPIError
 
-from . import texts
+from . import bonus, texts
 from .config import Config
 from .db import Database
 from .keyboards import offer_kb
@@ -68,6 +68,9 @@ class MatchService:
                 offer_id = await self.db.create_offer(req_id, m.trip_id, m.distance_km)
                 trip = await self.db.get_trip(m.trip_id)
                 passenger = await self.db.get_user(req["passenger_id"])
+                if req["ext_phone"]:  # haydovchi uzatgan yo'lovchi
+                    passenger = {"full_name": (req["ext_name"] or "Yo'lovchi")
+                                 + " (boshqa haydovchi uzatgan)"}
                 msg = await self._send(
                     trip["driver_id"],
                     texts.offer_text(req, passenger, m.distance_km, self.config.offer_timeout_min, m.covered),
@@ -125,30 +128,75 @@ class MatchService:
 
         trip = await self.db.get_trip(trip["id"])
         driver = await self.db.get_user(trip["driver_id"])
-        passenger = await self.db.get_user(req["passenger_id"])
+        if req["ext_phone"]:
+            await self._accept_referral(req, trip, driver)
+        else:
+            passenger = await self.db.get_user(req["passenger_id"])
+            await self._send(
+                req["passenger_id"],
+                "🎉 <b>Haydovchi topildi!</b>\n\n"
+                f"{texts.request_text(req)}\n\n"
+                f"<b>Haydovchi:</b> {texts.contact_line(driver)}\n"
+                + (f"Mashina: {texts.escape(trip['car'])}\n" if trip["car"] else "")
+                + (f"Narx: {texts.escape(trip['price'])}\n" if trip["price"] else "")
+                + "\nHaydovchi siz bilan bog'lanadi. Yaxshi yo'l!",
+            )
+            if trip["lat"] is not None:
+                try:
+                    await self.bot.send_location(req["passenger_id"], trip["lat"], trip["lon"])
+                except TelegramAPIError:
+                    pass
+            await self._send(
+                driver_id,
+                f"✅ So'rov #{req['id']} sizga biriktirildi.\n\n"
+                f"<b>Yo'lovchi:</b> {texts.contact_line(passenger)}\n"
+                f"Yo'nalish: {texts.route_text(req)}\n"
+                f"Kishi soni: {req['seats']}\n"
+                f"Qolgan bo'sh o'rin: {trip['seats_free']}",
+            )
+        if trip["seats_free"] <= 0:
+            await self.notify_full(trip)
+        return "ok"
+
+    async def _accept_referral(self, req, trip, driver) -> None:
+        """Uzatilgan yo'lovchini haydovchi oldi: kontakt + uzatgan haydovchiga bonus."""
+        name = texts.escape(req["ext_name"] or "Yo'lovchi")
         await self._send(
-            req["passenger_id"],
-            "🎉 <b>Haydovchi topildi!</b>\n\n"
-            f"{texts.request_text(req)}\n\n"
-            f"<b>Haydovchi:</b> {texts.contact_line(driver)}\n"
-            + (f"Mashina: {texts.escape(trip['car'])}\n" if trip["car"] else "")
-            + (f"Narx: {texts.escape(trip['price'])}\n" if trip["price"] else "")
-            + "\nHaydovchi siz bilan bog'lanadi. Yaxshi yo'l!",
-        )
-        if trip["lat"] is not None:
-            try:
-                await self.bot.send_location(req["passenger_id"], trip["lat"], trip["lon"])
-            except TelegramAPIError:
-                pass
-        await self._send(
-            driver_id,
-            f"✅ So'rov #{req['id']} sizga biriktirildi.\n\n"
-            f"<b>Yo'lovchi:</b> {texts.contact_line(passenger)}\n"
+            trip["driver_id"],
+            f"✅ So'rov #{req['id']} sizga biriktirildi (boshqa haydovchi uzatgan yo'lovchi).\n\n"
+            f"<b>Yo'lovchi:</b> {name}\n📞 {texts.escape(req['ext_phone'])}\n"
             f"Yo'nalish: {texts.route_text(req)}\n"
             f"Kishi soni: {req['seats']}\n"
-            f"Qolgan bo'sh o'rin: {trip['seats_free']}",
+            + (f"Izoh: {texts.escape(req['comment'])}\n" if req["comment"] else "")
+            + f"Qolgan bo'sh o'rin: {trip['seats_free']}\n\n"
+            "Yo'lovchiga o'zingiz qo'ng'iroq qiling.",
         )
-        return "ok"
+        points = req["seats"] * await bonus.per_seat(self.db)
+        await self.db.add_bonus(req["passenger_id"], points, "referral", req["id"])
+        balance = await self.db.bonus_balance(req["passenger_id"])
+        await self._send(
+            req["passenger_id"],
+            f"🎉 Siz uzatgan yo'lovchi ({name}, {req['seats']} kishi) haydovchiga ulandi!\n\n"
+            f"<b>Haydovchi:</b> {texts.contact_line(driver)}\n\n"
+            f"💰 Sizga <b>+{points} ball</b> yozildi. Jami: <b>{balance} ball</b>.",
+        )
+
+    async def notify_full(self, trip) -> None:
+        """Mashina to'ldi: oq yo'l tilash va yo'lovchi uzatib bonus yig'ishni taklif qilish."""
+        await self._send(trip["driver_id"], await bonus.full_trip_text(self.db),
+                         reply_markup=bonus.handover_kb())
+
+    async def _revoke_referral_bonus(self, req) -> None:
+        """Uzatilgan yo'lovchi biriktirilgandan keyin bekor bo'lsa — berilgan ball qaytariladi."""
+        if not req["ext_phone"]:
+            return
+        held = await self.db.bonus_for_request(req["id"])
+        if held > 0:
+            await self.db.add_bonus(req["passenger_id"], -held, "revoke", req["id"])
+            await self._send(
+                req["passenger_id"],
+                f"ℹ️ So'rov #{req['id']} bekor bo'ldi — {held} ball qaytarib olindi.",
+            )
 
     async def reject(self, offer_id: int, driver_id: int) -> bool:
         offer = await self.db.get_offer(offer_id)
@@ -173,6 +221,8 @@ class MatchService:
         was_matched = req["status"] == "matched"
         trip_id = req["trip_id"]
         await self.db.unmatch_request(req_id, "cancelled")
+        if was_matched:
+            await self._revoke_referral_bonus(req)
         if was_matched and trip_id:
             trip = await self.db.get_trip(trip_id)
             await self._send(
@@ -196,6 +246,7 @@ class MatchService:
             # Biriktirilgan yo'lovchilar uchun boshqa haydovchi qidiramiz
             for p in await self.db.passengers_of_trip(trip_id):
                 await self.db.unmatch_request(p["id"], "searching")
+                await self._revoke_referral_bonus(p)
                 await self._send(
                     p["passenger_id"],
                     f"⚠️ Haydovchi e'lonini bekor qildi. So'rov #{p['id']} uchun "

@@ -1,6 +1,6 @@
 from aiogram import F, Router
 
-from . import admin, common, driver, group, offers, passenger, voice
+from . import admin, common, driver, group, handover, offers, passenger, voice
 
 
 def setup_routers() -> Router:
@@ -14,6 +14,7 @@ def setup_routers() -> Router:
     private.include_router(admin.router)
     private.include_router(driver.router)
     private.include_router(passenger.router)
+    private.include_router(handover.router)
     private.include_router(offers.router)
     # voice oxirida: admin xabar tarqatishda ovozli xabar ham yuborishi mumkin
     private.include_router(voice.router)

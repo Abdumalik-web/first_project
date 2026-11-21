@@ -91,7 +91,8 @@ bot/
   voice.py       # ovoz -> matn -> e'lon ma'lumotlari
   group_parser.py # guruh xabarlaridan yo'lovchini ajratish
   ads.py         # admin bo'lgan guruhlarga reklama va haydovchi e'lonlari
-  handlers/      # common, admin, driver, passenger, offers, voice, group
+  bonus.py       # yo'lovchi uzatish uchun bonus ballar
+  handlers/      # common, admin, driver, passenger, handover, offers, voice, group
 tests/           # matching, service va to'liq oqim testlari
 ```
 
@@ -154,6 +155,27 @@ yo'nalish (tumanlar ➜ Toshkent yoki aksincha), sana va vaqt, bo'sh joylar, mas
 e'loningiz guruhlarimizga joylandi»*) va har bir yo'lovchiga (birinchi so'rovidan keyin)
 guruh havolasi **faqat bir marta** yuboriladi. Havolani almashtirish: `/guruh_link https://t.me/...`,
 o'chirish: `/guruh_link off`.
+
+## Yo'lovchi uzatish va bonus ballar
+
+Haydovchi o'zi olib keta olmaydigan yo'lovchini (mashina to'lgan, boshqa yo'nalish, botda
+bo'lmagan begona odam qo'ng'iroq qilgan va h.k.) **«📤 Yo'lovchi uzatish»** orqali botga kiritadi:
+yo'nalish, tumanlar, sana, vaqt, necha kishi, telefon raqami. Bot uni eng yaqin boshqa haydovchiga
+yuboradi.
+
+- Uzatilgan yo'lovchini boshqa haydovchi **qabul qilsa** — uzatgan haydovchiga
+  **har bir kishi uchun N ball** (standart 10) yoziladi. Faqat qabul qilinganda — soxta raqam bilan
+  ball yig'ib bo'lmaydi.
+- Keyin bekor qilinsa (yo'lovchi yoki olgan haydovchi bekor qilsa) — ball qaytarib olinadi.
+- Bir raqamni bir kunga ikki marta kiritib bo'lmaydi.
+- Yo'lovchi raqami faqat uni olgan haydovchiga ko'rsatiladi.
+- **«✅ To'ldim»** («📋 Mening e'lonlarim»da) yoki mashina bot orqali to'lsa — bot haydovchiga
+  «Oq yo'l!» tilaydi va yo'lovchi uzatib bonus yig'ishni taklif qiladi.
+- **«💰 Bonusim»** — balans, tarix va pulga aylantirish sharti.
+
+Admin: `/bonuslar` (eng ko'p yig'ganlar), `/bonus_tolash <id> <ball> [izoh]` (pul to'landi —
+ball yechiladi, foydalanuvchiga xabar boradi), `/bonus_qosh <id> <ball>`, `/bonus_ball 10`,
+`/bonus_info <shart matni>`.
 
 ## Ovozli xabar orqali e'lon
 

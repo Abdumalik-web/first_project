@@ -15,6 +15,8 @@ HELP = (
     "yuboriladi. Rad etsa yoki javob bermasa — keyingi eng yaqin haydovchiga o'tiladi.\n\n"
     "📍 Haydovchilar «Joylashuvni yangilash» tugmasi orqali hozirgi joyini yuborsa, "
     "eng yaqin yo'lovchilar aniqroq topiladi.\n\n"
+    "📤 <b>Yo'lovchi uzatish</b>: o'zingiz olib keta olmaydigan yo'lovchini botga kiriting — "
+    "boshqa haydovchi olsa, sizga <b>bonus ball</b> yoziladi («💰 Bonusim»).\n\n"
     "Buyruqlar: /start — bosh menyu, /cancel — joriy amalni bekor qilish."
 )
 

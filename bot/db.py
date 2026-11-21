@@ -78,6 +78,17 @@ CREATE TABLE IF NOT EXISTS trip_posts (
     PRIMARY KEY (trip_id, chat_id)
 );
 
+CREATE TABLE IF NOT EXISTS bonus_ledger (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id     INTEGER NOT NULL,
+    points      INTEGER NOT NULL,              -- musbat: qo'shildi, manfiy: yechildi
+    reason      TEXT NOT NULL,                 -- referral / revoke / payout / manual
+    request_id  INTEGER,
+    note        TEXT,
+    created_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_bonus_user ON bonus_ledger(user_id);
+
 CREATE TABLE IF NOT EXISTS settings (
     key     TEXT PRIMARY KEY,
     value   TEXT NOT NULL
@@ -124,6 +135,9 @@ class Database:
         await self._ensure_column("users", "banned", "INTEGER NOT NULL DEFAULT 0")
         await self._ensure_column("users", "source", "TEXT")
         await self._ensure_column("users", "link_notified", "INTEGER NOT NULL DEFAULT 0")
+        # Haydovchi uzatgan (botda bo'lmagan) yo'lovchi: passenger_id — uzatgan haydovchi
+        await self._ensure_column("requests", "ext_name", "TEXT")
+        await self._ensure_column("requests", "ext_phone", "TEXT")
         await self._ensure_column("groups", "last_ad_msg_id", "INTEGER")
         await self._ensure_column("groups", "last_ad_at", "TEXT")
         await self._ensure_column("groups", "msgs_since_ad", "INTEGER NOT NULL DEFAULT 1")
@@ -224,13 +238,14 @@ class Database:
     # --- requests ------------------------------------------------------------
     async def create_request(self, passenger_id: int, direction: str, fergana_code: str,
                              tashkent_code: str, lat: float | None, lon: float | None,
-                             trip_date: str, slot: str, seats: int, comment: str | None) -> int:
+                             trip_date: str, slot: str, seats: int, comment: str | None,
+                             ext_name: str | None = None, ext_phone: str | None = None) -> int:
         return await self.execute(
             """INSERT INTO requests(passenger_id, direction, fergana_code, tashkent_code, lat, lon,
-                   trip_date, slot, seats, comment, created_at)
-               VALUES(?,?,?,?,?,?,?,?,?,?,?)""",
+                   trip_date, slot, seats, comment, ext_name, ext_phone, created_at)
+               VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             passenger_id, direction, fergana_code, tashkent_code, lat, lon,
-            trip_date, slot, seats, comment, now_iso(),
+            trip_date, slot, seats, comment, ext_name, ext_phone, now_iso(),
         )
 
     async def get_request(self, req_id: int):
@@ -256,7 +271,12 @@ class Database:
 
     async def passengers_of_trip(self, trip_id: int):
         return await self.fetchall(
-            """SELECT r.*, u.full_name, u.username, u.phone FROM requests r
+            """SELECT r.*,
+                      COALESCE(r.ext_name, CASE WHEN r.ext_phone IS NOT NULL THEN 'Uzatilgan yo''lovchi' END,
+                               u.full_name) AS full_name,
+                      CASE WHEN r.ext_phone IS NULL THEN u.username END AS username,
+                      COALESCE(r.ext_phone, u.phone) AS phone
+               FROM requests r
                JOIN users u ON u.id = r.passenger_id
                WHERE r.trip_id=? AND r.status='matched' ORDER BY r.id""",
             trip_id,
@@ -621,3 +641,51 @@ class Database:
         where = self._USER_FILTERS.get(flt, "1=1")
         row = await self.fetchone(f"SELECT COUNT(*) FROM users u WHERE {where}")
         return row[0]
+
+    # --- bonus ballar ----------------------------------------------------------
+    async def add_bonus(self, uid: int, points: int, reason: str, request_id: int | None = None,
+                        note: str | None = None) -> None:
+        await self.execute(
+            "INSERT INTO bonus_ledger(user_id, points, reason, request_id, note, created_at)"
+            " VALUES(?,?,?,?,?,?)",
+            uid, points, reason, request_id, note, now_iso(),
+        )
+
+    async def bonus_balance(self, uid: int) -> int:
+        row = await self.fetchone("SELECT COALESCE(SUM(points),0) FROM bonus_ledger WHERE user_id=?", uid)
+        return row[0]
+
+    async def bonus_for_request(self, request_id: int) -> int:
+        """Shu so'rov uchun hozir hisobda turgan ball (berilgan - qaytarib olingan)."""
+        row = await self.fetchone(
+            "SELECT COALESCE(SUM(points),0) FROM bonus_ledger WHERE request_id=? AND reason IN ('referral','revoke')",
+            request_id,
+        )
+        return row[0]
+
+    async def bonus_history(self, uid: int, limit: int = 10):
+        return await self.fetchall(
+            "SELECT * FROM bonus_ledger WHERE user_id=? ORDER BY id DESC LIMIT ?", uid, limit
+        )
+
+    async def bonus_top(self, limit: int = 20):
+        return await self.fetchall(
+            """SELECT b.user_id, SUM(b.points) AS balance,
+                      SUM(CASE WHEN b.reason='referral' THEN 1 ELSE 0 END) AS referrals,
+                      u.full_name, u.username, u.phone
+               FROM bonus_ledger b LEFT JOIN users u ON u.id=b.user_id
+               GROUP BY b.user_id HAVING balance != 0 OR referrals > 0
+               ORDER BY balance DESC LIMIT ?""",
+            limit,
+        )
+
+    async def referral_exists(self, ext_phone: str, trip_date: str) -> bool:
+        """Shu raqamli yo'lovchi shu kunga allaqachon uzatilganmi (bir odamni ikki marta sanamaslik)."""
+        row = await self.fetchone(
+            "SELECT 1 FROM requests WHERE ext_phone=? AND trip_date=? AND status IN ('searching','matched')",
+            ext_phone, trip_date,
+        )
+        return row is not None
+
+    async def set_trip_full(self, trip_id: int) -> None:
+        await self.execute("UPDATE trips SET seats_free=0 WHERE id=?", trip_id)
