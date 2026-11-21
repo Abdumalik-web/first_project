@@ -171,7 +171,7 @@ class MatchService:
             + f"Qolgan bo'sh o'rin: {trip['seats_free']}\n\n"
             "Yo'lovchiga o'zingiz qo'ng'iroq qiling.",
         )
-        points = req["seats"] * await bonus.per_seat(self.db)
+        points = await bonus.per_handover(self.db)
         await self.db.add_bonus(req["passenger_id"], points, "referral", req["id"])
         balance = await self.db.bonus_balance(req["passenger_id"])
         await self._send(

@@ -12,6 +12,7 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from .db import Database
 
+# Kalit nomi eski bazalar bilan moslik uchun o'zgarmagan; qiymat — bitta uzatish uchun ball
 K_PER_SEAT = "bonus_per_seat"
 K_INFO = "bonus_info"
 DEFAULT_PER_SEAT = 10
@@ -20,7 +21,8 @@ DEFAULT_INFO = "Ballarni pulga aylantirish uchun admin bilan bog'laning."
 HANDOVER_CB = "ho:start"
 
 
-async def per_seat(db: Database) -> int:
+async def per_handover(db: Database) -> int:
+    """Bitta uzatilgan yo'lovchi (necha kishi bo'lishidan qat'i nazar) uchun ball."""
     return int(await db.get_setting(K_PER_SEAT, str(DEFAULT_PER_SEAT)))
 
 
@@ -36,13 +38,13 @@ def handover_kb() -> InlineKeyboardMarkup:
 
 async def full_trip_text(db: Database) -> str:
     """Haydovchi to'lganda: oq yo'l + bonus taklifi."""
-    pts = await per_seat(db)
+    pts = await per_handover(db)
     return (
         "🎉 <b>Mashinangiz to'ldi — oq yo'l!</b> 🚗💨\n\n"
         "💰 <b>Qo'shimcha daromad imkoniyati:</b> sizga qo'ng'iroq qilgan, lekin endi olib keta "
         "olmaydigan yo'lovchilar bormi? Ularni botga uzating — qayerdan qayerga, necha kishi va "
         "telefon raqami. Bot ularni eng yaqin haydovchiga yuboradi.\n\n"
-        f"Uzatgan yo'lovchingizni boshqa haydovchi olsa — <b>har bir kishi uchun {pts} ball</b> "
+        f"Uzatgan yo'lovchingizni boshqa haydovchi olsa — <b>har bir uzatish uchun {pts} ball</b> "
         "olasiz. Ballarni pulga aylantirish mumkin.\n\n"
         f"ℹ️ {escape(await info_text(db))}"
     )
@@ -50,7 +52,7 @@ async def full_trip_text(db: Database) -> str:
 
 async def explain_text(db: Database, uid: int) -> str:
     """«💰 Bonusim» ekrani."""
-    pts = await per_seat(db)
+    pts = await per_handover(db)
     balance = await db.bonus_balance(uid)
     lines = [
         f"💰 <b>Bonus ballaringiz: {balance}</b>\n",
@@ -58,7 +60,8 @@ async def explain_text(db: Database, uid: int) -> str:
         "Sizga qo'ng'iroq qilgan yo'lovchini o'zingiz olib keta olmasangiz (mashina to'lgan, "
         "boshqa yo'nalish, siz Toshkentda — u Farg'onada va h.k.), uni "
         "<b>«📤 Yo'lovchi uzatish»</b> orqali botga kiriting.",
-        f"Bot uni eng yaqin haydovchiga yuboradi. Haydovchi olsa — <b>har bir kishi uchun {pts} ball</b>.",
+        f"Bot uni eng yaqin haydovchiga yuboradi. Haydovchi olsa — <b>har bir uzatish uchun {pts} ball</b> "
+        "(necha kishi bo'lishidan qat'i nazar).",
         "Yo'lovchi keyin bekor qilinsa, ball qaytarib olinadi.\n",
         f"ℹ️ {escape(await info_text(db))}",
     ]

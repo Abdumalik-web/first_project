@@ -109,11 +109,11 @@ async def _done(cb: CallbackQuery, text: str) -> None:
 async def _start(message: Message, state: FSMContext, db: Database, user) -> None:
     await db.upsert_user(user.id, user.full_name, user.username)
     await state.set_data({})
-    pts = await bonus.per_seat(db)
+    pts = await bonus.per_handover(db)
     await message.answer(
         "📤 <b>Yo'lovchi uzatish</b>\n\n"
         "O'zingiz olib keta olmaydigan yo'lovchini kiriting — bot uni eng yaqin haydovchiga yuboradi. "
-        f"Haydovchi olsa, sizga <b>har bir kishi uchun {pts} ball</b> yoziladi.\n"
+        f"Haydovchi olsa, sizga <b>{pts} ball</b> yoziladi.\n"
         "Bekor qilish uchun ❌ tugmasini bosing.",
         reply_markup=cancel_kb(),
     )
@@ -224,7 +224,7 @@ async def confirm(cb: CallbackQuery, state: FSMContext, db: Database, svc: Match
         d["trip_date"], d["slot"], d["seats"], d.get("ext_name"),
         ext_name=d.get("ext_name"), ext_phone=d["ext_phone"],
     )
-    pts = d["seats"] * await bonus.per_seat(db)
+    pts = await bonus.per_handover(db)
     await cb.message.answer(
         f"✅ Yo'lovchi #{req_id} botga uzatildi. Eng yaqin haydovchini qidiryapmiz.\n"
         f"Haydovchi olishi bilan sizga xabar beramiz va <b>{pts} ball</b> yoziladi.",

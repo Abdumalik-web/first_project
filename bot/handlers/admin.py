@@ -330,11 +330,11 @@ async def group_link(message: Message, command: CommandObject, db: Database) -> 
 
 # --- bonus ballar -------------------------------------------------------------
 async def _bonus_admin_text(db: Database) -> str:
-    pts = await bonus.per_seat(db)
+    pts = await bonus.per_handover(db)
     info = await bonus.info_text(db)
     lines = [
         "💰 <b>Bonus ballar</b>\n",
-        f"Uzatilgan yo'lovchini boshqa haydovchi olsa: <b>{pts} ball / kishi</b>",
+        f"Uzatilgan yo'lovchini boshqa haydovchi olsa: <b>{pts} ball</b> (har bir uzatish uchun, necha kishi bo'lishidan qat'i nazar)",
         f"Foydalanuvchilarga ko'rinadigan shart: <i>{escape(info)}</i>\n",
         "<b>Eng ko'p ball yig'ganlar:</b>",
     ]
@@ -351,7 +351,7 @@ async def _bonus_admin_text(db: Database) -> str:
         "",
         "/bonus_tolash <i>id ball [izoh]</i> — pul to'lab berildi, ballni yechish",
         "/bonus_qosh <i>id ball [izoh]</i> — qo'lda ball qo'shish (manfiy ham bo'ladi)",
-        "/bonus_ball <i>son</i> — 1 kishi uchun necha ball",
+        "/bonus_ball <i>son</i> — bitta uzatish uchun necha ball",
         "/bonus_info <i>matn</i> — pulga aylantirish sharti (masalan: «1 ball = 1000 so'm, 100 balldan»)",
     ]
     return "\n".join(lines)
@@ -375,7 +375,7 @@ async def bonus_per_seat(message: Message, command: CommandObject, db: Database)
         await message.answer("Masalan: <code>/bonus_ball 10</code>")
         return
     await db.set_setting(bonus.K_PER_SEAT, arg)
-    await message.answer(f"✅ Endi har bir uzatilgan kishi uchun {arg} ball.")
+    await message.answer(f"✅ Endi har bir uzatilgan yo'lovchi uchun {arg} ball.")
 
 
 @router.message(Command("bonus_info"))

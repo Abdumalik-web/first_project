@@ -546,7 +546,7 @@ async def test_handover_bonus_flow(app):
     await send(bot, dp, A, "Akmal aka, yuki bor")
     assert "+998903334455" in bot.texts_to(A)[-1]
     await click(bot, dp, A, "ho:ok")
-    assert "uzatildi" in bot.texts_to(A)[-1] and "20 ball" in bot.texts_to(A)[-1]
+    assert "uzatildi" in bot.texts_to(A)[-1] and "10 ball" in bot.texts_to(A)[-1]
 
     # 2) B ga taklif keladi — kim uzatgani aytiladi, raqam hali ko'rinmaydi
     offer = bot.texts_to(B)[-1]
@@ -556,9 +556,9 @@ async def test_handover_bonus_flow(app):
     assert any("+998903334455" in t and "Akmal aka" in t for t in out_b)
     # Mashina to'ldi (2 o'rin) — oq yo'l va bonus taklifi avtomatik
     assert any("oq yo'l" in t for t in out_b)
-    # A ga bonus
-    assert any("+20 ball" in t and "+998902220000" in t for t in bot.texts_to(A))
-    assert await db.bonus_balance(A) == 20
+    # A ga bonus: 2 kishi bo'lsa ham — bitta uzatish uchun 10 ball
+    assert any("+10 ball" in t and "+998902220000" in t for t in bot.texts_to(A))
+    assert await db.bonus_balance(A) == 10
 
     # 3) Shu raqamni shu kunga qayta uzatib bo'lmaydi
     await handover("+998903334455")
@@ -567,7 +567,7 @@ async def test_handover_bonus_flow(app):
 
     # 4) «💰 Bonusim»
     await send(bot, dp, A, "💰 Bonusim")
-    assert "Bonus ballaringiz: 20" in bot.texts_to(A)[-1]
+    assert "Bonus ballaringiz: 10" in bot.texts_to(A)[-1]
 
     # 5) B «To'ldim» ni qo'lda bosadi (yangi e'lon bilan)
     t_b2 = await db.create_trip(B, "T2F", ["quva"], tomorrow, "evening", 4, None, None, None, None)
@@ -592,4 +592,4 @@ async def test_handover_bonus_flow(app):
     await send(bot, dp, ADMIN, "/bonus_info 1 ball = 1000 so'm")
     await click(bot, dp, ADMIN, "adm:bonus")
     txt = bot.texts_to(ADMIN)[-1]
-    assert "15 ball / kishi" in txt and "1000 so'm" in txt and str(A) in txt
+    assert "<b>15 ball</b>" in txt and "1000 so'm" in txt and str(A) in txt

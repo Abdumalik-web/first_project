@@ -164,7 +164,7 @@ yo'nalish, tumanlar, sana, vaqt, necha kishi, telefon raqami. Bot uni eng yaqin 
 yuboradi.
 
 - Uzatilgan yo'lovchini boshqa haydovchi **qabul qilsa** — uzatgan haydovchiga
-  **har bir kishi uchun N ball** (standart 10) yoziladi. Faqat qabul qilinganda — soxta raqam bilan
+  **har bir uzatish uchun N ball** (standart 10, necha kishi bo'lishidan qat'i nazar) yoziladi. Faqat qabul qilinganda — soxta raqam bilan
   ball yig'ib bo'lmaydi.
 - Keyin bekor qilinsa (yo'lovchi yoki olgan haydovchi bekor qilsa) — ball qaytarib olinadi.
 - Bir raqamni bir kunga ikki marta kiritib bo'lmaydi.
