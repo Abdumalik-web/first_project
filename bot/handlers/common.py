@@ -1,15 +1,17 @@
 from __future__ import annotations
 
-from aiogram import F, Router
+from aiogram import Bot, F, Router
 from aiogram.filters import Command, CommandObject, CommandStart, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
-from .. import bonus, texts
+from .. import bonus, referral, texts
+from ..config import Config
 from ..db import Database
 from ..regions import DIRECTIONS
 from ..keyboards import (
     BTN_BONUS,
+    BTN_INVITE,
     cancel_kb,
     BTN_CANCEL,
     BTN_HELP,
@@ -24,12 +26,46 @@ router = Router(name="common")
 
 
 @router.message(CommandStart())
-async def start(message: Message, state: FSMContext, db: Database,
+async def start(message: Message, state: FSMContext, db: Database, bot: Bot, config: Config,
                 command: CommandObject | None = None) -> None:
     await state.clear()
     u = message.from_user
+    is_new = await db.get_user(u.id) is None
     await db.upsert_user(u.id, u.full_name, u.username)
     args = (command.args or "") if command else ""
+    if is_new:
+        # Taklif: botga shaxsiy havola (r<id>) yoki guruhga shaxsiy havola orqali kirgan
+        ref = int(args[1:]) if args.startswith("r") and args[1:].isdigit() else None
+        pending = await db.pop_pending_ref(u.id)
+        ref = ref or pending
+        if ref:
+            await db.set_referrer(u.id, ref)
+    # Majburiy guruh: qo'shilmagan bo'lsa — avval guruhga
+    if u.id not in config.admin_ids and not await referral.check_member(bot, db, u.id, force=True):
+        await message.answer(await referral.gate_text(db),
+                             reply_markup=referral.gate_kb(await referral.group_url(db), args))
+        return
+    await referral.maybe_award(bot, db, u.id)
+    await _welcome(message, state, db, u, args)
+
+
+@router.callback_query(F.data.startswith("gate:"))
+async def gate_check(cb: CallbackQuery, state: FSMContext, db: Database, bot: Bot) -> None:
+    args = cb.data[len("gate:"):]
+    if not await referral.check_member(bot, db, cb.from_user.id, force=True):
+        await cb.answer("Siz hali guruhga qo'shilmagansiz. Avval «👥 Guruhga qo'shilish» ni bosing.",
+                        show_alert=True)
+        return
+    await cb.answer("✅ Rahmat!")
+    try:
+        await cb.message.delete()
+    except Exception:  # noqa: BLE001
+        pass
+    await referral.maybe_award(bot, db, cb.from_user.id)
+    await _welcome(cb.message, state, db, cb.from_user, args)
+
+
+async def _welcome(message: Message, state: FSMContext, db: Database, u, args: str) -> None:
     group_part, _, direction = args.partition("_")
     if group_part.startswith("g") and group_part[1:].isdigit():
         # Guruhdagi reklama tugmasi orqali kelgan
@@ -61,6 +97,13 @@ async def start(message: Message, state: FSMContext, db: Database,
         "Kimsiz?",
         reply_markup=main_menu(),
     )
+
+
+@router.message(StateFilter(None), F.text == BTN_INVITE)
+@router.message(Command("taklif"))
+async def invite(message: Message, db: Database, bot: Bot) -> None:
+    text, kb = await referral.invite_text(bot, db, message.from_user.id)
+    await message.answer(text, reply_markup=kb, disable_web_page_preview=True)
 
 
 @router.message(Command("help"))

@@ -22,7 +22,7 @@ from aiogram.types import (
     TelegramObject,
 )
 
-from .. import bonus, texts
+from .. import bonus, referral, texts
 from ..ads import K_ACTIVITY as AD_ACTIVITY, K_ENABLED as AD_ENABLED, K_INTERVAL as AD_INTERVAL
 from ..ads import K_TRIPS_ENABLED, K_TRIPS_INTERVAL, MIN_INTERVAL_MIN, AdService, ad_settings, k_button, k_text
 from ..config import Config
@@ -81,7 +81,8 @@ ADMIN_HELP = (
     "/tekshir <i>matn</i> — guruh xabarini bot qanday tushunishini ko'rish\n"
     "/reklama — guruh reklamasi, /elon — haydovchi e'lonlarini guruhlarga joylash\n"
     "/guruh_link — haydovchi va yo'lovchilarga bir marta yuboriladigan guruh havolasi\n"
-    "/bonuslar — bonus ballar, to'lovlar va sozlamalar"
+    "/bonuslar — bonus ballar, to'lovlar va sozlamalar\n"
+    "/majburiy_guruh — guruhga qo'shilmaganlar botdan foydalana olmasin"
 )
 
 
@@ -335,6 +336,7 @@ async def _bonus_admin_text(db: Database) -> str:
     lines = [
         "💰 <b>Bonus ballar</b>\n",
         f"Uzatilgan yo'lovchini boshqa haydovchi olsa: <b>{pts} ball</b> (har bir uzatish uchun, necha kishi bo'lishidan qat'i nazar)",
+        f"Taklif qilingan har bir yangi odam uchun: <b>{await referral.ref_points(db)} ball</b>",
         f"Foydalanuvchilarga ko'rinadigan shart: <i>{escape(info)}</i>\n",
         "<b>Eng ko'p ball yig'ganlar:</b>",
     ]
@@ -352,6 +354,7 @@ async def _bonus_admin_text(db: Database) -> str:
         "/bonus_tolash <i>id ball [izoh]</i> — pul to'lab berildi, ballni yechish",
         "/bonus_qosh <i>id ball [izoh]</i> — qo'lda ball qo'shish (manfiy ham bo'ladi)",
         "/bonus_ball <i>son</i> — bitta uzatish uchun necha ball",
+        "/taklif_ball <i>son</i> — taklif qilingan bitta odam uchun necha ball",
         "/bonus_info <i>matn</i> — pulga aylantirish sharti (masalan: «1 ball = 1000 so'm, 100 balldan»)",
     ]
     return "\n".join(lines)
@@ -421,6 +424,53 @@ async def bonus_change(message: Message, command: CommandObject, db: Database, b
     except TelegramAPIError:
         pass
     await message.answer(f"✅ Bajarildi. {uid} balansi: {balance} ball.")
+
+
+# --- majburiy guruh va taklif (referal) -----------------------------------------
+@router.message(Command("majburiy_guruh"))
+async def required_group_cmd(message: Message, command: CommandObject, db: Database, ads: AdService) -> None:
+    arg = (command.args or "").strip()
+    current = await referral.required_group(db)
+    if not arg:
+        lines = [
+            "🔒 <b>Majburiy guruh</b>: " + (f"<code>{current}</code>" if current else "o'rnatilmagan")
+            + "\nBelgilansa — guruhga qo'shilmagan odam botdan foydalana olmaydi.\n",
+            "<b>Ma'lum guruhlar:</b>",
+        ]
+        for g in await db.fetchall("SELECT * FROM groups WHERE active=1 ORDER BY title"):
+            admin = "admin ✅" if await ads.is_admin_in(g["id"]) else "admin emas ❌"
+            lines.append(f"• {escape(g['title'] or '')} — <code>/majburiy_guruh {g['id']}</code> ({admin})")
+        lines.append("\nO'chirish: <code>/majburiy_guruh off</code>\n"
+                     "Bot o'sha guruhda <b>admin</b> bo'lishi kerak («Invite users via link» huquqi bilan). "
+                     "Guruhga kirish havolasini /guruh_link bilan ham to'g'ri qo'ying.")
+        await message.answer("\n".join(lines))
+        return
+    if arg.lower() == "off":
+        await db.set_setting(referral.K_REQUIRED_GROUP, "")
+        await message.answer("🔓 Majburiy guruh o'chirildi — hamma botdan foydalana oladi.")
+        return
+    if not arg.lstrip("-").isdigit():
+        await message.answer("Masalan: <code>/majburiy_guruh -1001234567890</code>")
+        return
+    chat_id = int(arg)
+    if not await ads.is_admin_in(chat_id):
+        await message.answer("❌ Bot bu guruhda admin emas. Avval botni guruhda admin qiling.")
+        return
+    await db.set_setting(referral.K_REQUIRED_GROUP, str(chat_id))
+    await message.answer(
+        "🔒 Saqlandi. Endi guruhga qo'shilmagan foydalanuvchilar botdan foydalana olmaydi "
+        "(adminlar bundan mustasno). Taklif havolalari ham shu guruh bo'yicha ishlaydi."
+    )
+
+
+@router.message(Command("taklif_ball"))
+async def ref_points_cmd(message: Message, command: CommandObject, db: Database) -> None:
+    arg = (command.args or "").strip()
+    if not arg.isdigit():
+        await message.answer("Masalan: <code>/taklif_ball 5</code>")
+        return
+    await db.set_setting(referral.K_REF_POINTS, arg)
+    await message.answer(f"✅ Endi taklif qilingan har bir yangi odam uchun {arg} ball.")
 
 
 @router.message(Command("reklama_hozir"))

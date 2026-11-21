@@ -10,7 +10,7 @@ from .ads import AdService
 from .config import load_config
 from .db import Database
 from .handlers import setup_routers
-from .middlewares import BanMiddleware
+from .middlewares import BanMiddleware, GroupGateMiddleware
 from .service import MatchService
 from .voice import VoiceParser
 
@@ -36,6 +36,8 @@ async def main() -> None:
         logging.info("Ovozli xabarlar o'chiq (ANTHROPIC_API_KEY va STT_API_KEY kerak).")
     dp.message.outer_middleware(BanMiddleware())
     dp.callback_query.outer_middleware(BanMiddleware())
+    dp.message.outer_middleware(GroupGateMiddleware())
+    dp.callback_query.outer_middleware(GroupGateMiddleware())
     dp.include_router(setup_routers())
     if not config.admin_ids:
         logging.warning("ADMIN_IDS bo'sh — admin panel hech kimga ochilmaydi. /id bilan ID'ingizni bilib oling.")

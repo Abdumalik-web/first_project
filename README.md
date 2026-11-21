@@ -92,6 +92,7 @@ bot/
   group_parser.py # guruh xabarlaridan yo'lovchini ajratish
   ads.py         # admin bo'lgan guruhlarga reklama va haydovchi e'lonlari
   bonus.py       # yo'lovchi uzatish uchun bonus ballar
+  referral.py    # taklif havolalari va majburiy guruh
   handlers/      # common, admin, driver, passenger, handover, offers, voice, group
 tests/           # matching, service va to'liq oqim testlari
 ```
@@ -176,6 +177,19 @@ yuboradi.
 Admin: `/bonuslar` (eng ko'p yig'ganlar), `/bonus_tolash <id> <ball> [izoh]` (pul to'landi —
 ball yechiladi, foydalanuvchiga xabar boradi), `/bonus_qosh <id> <ball>`, `/bonus_ball 10`,
 `/bonus_info <shart matni>`.
+
+## Taklif havolalari va majburiy guruh
+
+- **«👥 Do'stlarni taklif qilish»** — har bir foydalanuvchiga shaxsiy havolalar: botga
+  (`t.me/<bot>?start=r<id>`) va guruhga (bot yaratgan shaxsiy taklif havolasi) hamda «Ulashish» tugmasi.
+- Shu havolalar orqali kelgan **yangi** odam botga ham, guruhga ham qo'shilgach, taklif qilganga
+  **5 ball** (`/taklif_ball` bilan o'zgaradi). Bir odam uchun bir marta; botda oldin bo'lgan odam
+  hisoblanmaydi.
+- **Majburiy guruh** (`/majburiy_guruh <id>`): guruhga qo'shilmagan odam botdan foydalana olmaydi —
+  bot «👥 Guruhga qo'shilish» va «✅ Qo'shildim» tugmalarini ko'rsatadi. Guruhdan chiqsa — yana
+  to'xtatiladi. Adminlar tekshirilmaydi. `/majburiy_guruh off` — o'chirish.
+- Bot o'sha guruhda **admin** bo'lishi kerak («Invite users via link» huquqi bilan) — shaxsiy
+  guruh havolalari va kim qo'shilganini ko'rish uchun.
 
 ## Ovozli xabar orqali e'lon
 

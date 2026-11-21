@@ -16,6 +16,7 @@ BTN_MY = "📋 Mening e'lonlarim"
 BTN_HELP = "ℹ️ Yordam"
 BTN_HANDOVER = "📤 Yo'lovchi uzatish"
 BTN_BONUS = "💰 Bonusim"
+BTN_INVITE = "👥 Do'stlarni taklif qilish"
 BTN_LOCATION = "📍 Joylashuvni yangilash"
 BTN_CANCEL = "❌ Bekor qilish"
 BTN_SKIP = "⏭ O'tkazib yuborish"
@@ -28,7 +29,8 @@ def main_menu() -> ReplyKeyboardMarkup:
         keyboard=[
             [KeyboardButton(text=BTN_DRIVER), KeyboardButton(text=BTN_PASSENGER)],
             [KeyboardButton(text=BTN_HANDOVER), KeyboardButton(text=BTN_BONUS)],
-            [KeyboardButton(text=BTN_MY), KeyboardButton(text=BTN_HELP)],
+            [KeyboardButton(text=BTN_INVITE), KeyboardButton(text=BTN_MY)],
+            [KeyboardButton(text=BTN_HELP)],
             [KeyboardButton(text=BTN_LOCATION, request_location=True)],
         ],
         resize_keyboard=True,

@@ -89,6 +89,19 @@ CREATE TABLE IF NOT EXISTS bonus_ledger (
 );
 CREATE INDEX IF NOT EXISTS ix_bonus_user ON bonus_ledger(user_id);
 
+CREATE TABLE IF NOT EXISTS ref_links (
+    user_id     INTEGER NOT NULL,
+    chat_id     INTEGER NOT NULL,
+    invite_link TEXT NOT NULL UNIQUE,
+    PRIMARY KEY (user_id, chat_id)
+);
+
+CREATE TABLE IF NOT EXISTS pending_refs (
+    user_id     INTEGER PRIMARY KEY,   -- guruhga taklif havolasi orqali kirgan, botda hali yo'q
+    referrer_id INTEGER NOT NULL,
+    created_at  TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS settings (
     key     TEXT PRIMARY KEY,
     value   TEXT NOT NULL
@@ -135,6 +148,11 @@ class Database:
         await self._ensure_column("users", "banned", "INTEGER NOT NULL DEFAULT 0")
         await self._ensure_column("users", "source", "TEXT")
         await self._ensure_column("users", "link_notified", "INTEGER NOT NULL DEFAULT 0")
+        # Taklif (referal) va majburiy guruh a'zoligi
+        await self._ensure_column("users", "referrer_id", "INTEGER")
+        await self._ensure_column("users", "ref_awarded", "INTEGER NOT NULL DEFAULT 0")
+        await self._ensure_column("users", "group_ok", "INTEGER NOT NULL DEFAULT 0")
+        await self._ensure_column("users", "group_checked_at", "TEXT")
         # Haydovchi uzatgan (botda bo'lmagan) yo'lovchi: passenger_id — uzatgan haydovchi
         await self._ensure_column("requests", "ext_name", "TEXT")
         await self._ensure_column("requests", "ext_phone", "TEXT")
@@ -671,7 +689,7 @@ class Database:
     async def bonus_top(self, limit: int = 20):
         return await self.fetchall(
             """SELECT b.user_id, SUM(b.points) AS balance,
-                      SUM(CASE WHEN b.reason='referral' THEN 1 ELSE 0 END) AS referrals,
+                      SUM(CASE WHEN b.reason IN ('referral','invite') THEN 1 ELSE 0 END) AS referrals,
                       u.full_name, u.username, u.phone
                FROM bonus_ledger b LEFT JOIN users u ON u.id=b.user_id
                GROUP BY b.user_id HAVING balance != 0 OR referrals > 0
@@ -689,3 +707,61 @@ class Database:
 
     async def set_trip_full(self, trip_id: int) -> None:
         await self.execute("UPDATE trips SET seats_free=0 WHERE id=?", trip_id)
+
+    # --- taklif (referal) ------------------------------------------------------
+    async def set_referrer(self, uid: int, referrer_id: int) -> bool:
+        if uid == referrer_id:
+            return False
+        n = await self._exec_count(
+            "UPDATE users SET referrer_id=? WHERE id=? AND referrer_id IS NULL"
+            " AND EXISTS (SELECT 1 FROM users r WHERE r.id=?)",
+            referrer_id, uid, referrer_id,
+        )
+        return n == 1
+
+    async def mark_ref_awarded(self, uid: int) -> bool:
+        n = await self._exec_count(
+            "UPDATE users SET ref_awarded=1 WHERE id=? AND ref_awarded=0 AND referrer_id IS NOT NULL", uid
+        )
+        return n == 1
+
+    async def referral_stats(self, uid: int) -> tuple[int, int]:
+        """(taklif qilinganlar, ball berilganlar)."""
+        row = await self.fetchone(
+            "SELECT COUNT(*), COALESCE(SUM(ref_awarded),0) FROM users WHERE referrer_id=?", uid
+        )
+        return row[0], row[1]
+
+    async def set_group_ok(self, uid: int, ok: bool) -> None:
+        await self.execute(
+            "UPDATE users SET group_ok=?, group_checked_at=? WHERE id=?", int(ok), now_iso(), uid
+        )
+
+    async def get_ref_link(self, uid: int, chat_id: int) -> str | None:
+        row = await self.fetchone(
+            "SELECT invite_link FROM ref_links WHERE user_id=? AND chat_id=?", uid, chat_id
+        )
+        return row["invite_link"] if row else None
+
+    async def save_ref_link(self, uid: int, chat_id: int, link: str) -> None:
+        await self.execute(
+            "INSERT OR REPLACE INTO ref_links(user_id, chat_id, invite_link) VALUES(?,?,?)",
+            uid, chat_id, link,
+        )
+
+    async def referrer_by_link(self, link: str) -> int | None:
+        row = await self.fetchone("SELECT user_id FROM ref_links WHERE invite_link=?", link)
+        return row["user_id"] if row else None
+
+    async def add_pending_ref(self, uid: int, referrer_id: int) -> None:
+        await self.execute(
+            "INSERT OR IGNORE INTO pending_refs(user_id, referrer_id, created_at) VALUES(?,?,?)",
+            uid, referrer_id, now_iso(),
+        )
+
+    async def pop_pending_ref(self, uid: int) -> int | None:
+        row = await self.fetchone("SELECT referrer_id FROM pending_refs WHERE user_id=?", uid)
+        if row:
+            await self.execute("DELETE FROM pending_refs WHERE user_id=?", uid)
+            return row["referrer_id"]
+        return None

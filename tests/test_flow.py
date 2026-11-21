@@ -11,7 +11,7 @@ from aiogram.types import CallbackQuery, Chat, Contact, Location, Message, Updat
 from bot.config import Config
 from bot.db import Database
 from bot.handlers import setup_routers
-from bot.middlewares import BanMiddleware
+from bot.middlewares import BanMiddleware, GroupGateMiddleware
 from bot.regions import today
 from bot.service import MatchService
 
@@ -24,6 +24,8 @@ class RecBot(Bot):
         self.calls: list[TelegramMethod] = []
 
     admin_chats: set = set()
+    members: dict = {}   # chat_id -> set(user_id)
+    _links = 0
 
     async def __call__(self, method, request_timeout=None):
         self.calls.append(method)
@@ -32,7 +34,14 @@ class RecBot(Bot):
         if isinstance(method, GetMe):
             return User(id=42, is_bot=True, first_name="Bot", username="testbot")
         if isinstance(method, GetChatMember):
-            return SimpleNamespace(status="administrator" if method.chat_id in self.admin_chats else "member")
+            if method.user_id == 42:  # botning o'zi
+                return SimpleNamespace(status="administrator" if method.chat_id in self.admin_chats else "member")
+            ok = method.user_id in self.members.get(method.chat_id, set())
+            return SimpleNamespace(status="member" if ok else "left")
+        from aiogram.methods import CreateChatInviteLink
+        if isinstance(method, CreateChatInviteLink):
+            RecBot._links += 1
+            return SimpleNamespace(invite_link=f"https://t.me/+ref{RecBot._links}")
         if isinstance(method, SendMessage):
             return Message(message_id=next(_ids), date=datetime.now(),
                            chat=Chat(id=method.chat_id, type="private"), text=method.text)
@@ -61,10 +70,14 @@ async def app(tmp_path):
     dp["db"], dp["svc"], dp["config"], dp["ads"] = db, svc, cfg, AdService(bot, db)
     dp.message.outer_middleware(BanMiddleware())
     dp.callback_query.outer_middleware(BanMiddleware())
+    dp.message.outer_middleware(GroupGateMiddleware())
+    dp.callback_query.outer_middleware(GroupGateMiddleware())
+    bot.members = {}
     dp.include_router(setup_routers())
     yield bot, dp, db
     await db.close()
     # Modul darajasidagi routerlarni keyingi test uchun ajratamiz
+    bot.admin_chats = set()
     from bot.handlers import admin, common, driver, group, handover, offers, passenger, voice
     for m in (admin, common, driver, group, handover, offers, passenger, voice):
         m.router._parent_router = None
@@ -593,3 +606,87 @@ async def test_handover_bonus_flow(app):
     await click(bot, dp, ADMIN, "adm:bonus")
     txt = bot.texts_to(ADMIN)[-1]
     assert "<b>15 ball</b>" in txt and "1000 so'm" in txt and str(A) in txt
+
+
+
+# --- Taklif (referal) va majburiy guruh ----------------------------------------
+async def member_event(bot, dp, chat_id, uid, joined=True, link=None):
+    from aiogram.types import ChatInviteLink, ChatMemberLeft, ChatMemberMember, ChatMemberUpdated
+    u = _user(uid)
+    old = ChatMemberLeft(user=u) if joined else ChatMemberMember(user=u)
+    new = ChatMemberMember(user=u) if joined else ChatMemberLeft(user=u)
+    inv = ChatInviteLink(invite_link=link, creator=User(id=42, is_bot=True, first_name="Bot"),
+                         creates_join_request=False, is_primary=False, is_revoked=False) if link else None
+    ev = ChatMemberUpdated(chat=Chat(id=chat_id, type="supergroup", title="Taksi"), from_user=u,
+                           date=datetime.now(), old_chat_member=old, new_chat_member=new, invite_link=inv)
+    await dp.feed_update(bot, Update(update_id=next(_ids), chat_member=ev))
+
+
+async def test_referral_and_group_gate(app):
+    bot, dp, db = app
+    ADMIN, R, N, E, M = 900, 1201, 1202, 1203, 1204
+    G = -1004444444444
+    bot.admin_chats = {G}
+    bot.members = {G: {R, E}}
+    await group_msg(bot, dp, G, R, "salom")            # guruh bazaga tushadi
+    await send(bot, dp, E, "/start")                     # E — eski foydalanuvchi (hali majburiy guruh yo'q)
+
+    # Admin majburiy guruhni yoqadi (admin o'zi guruhda bo'lmasa ham ishlay oladi)
+    await send(bot, dp, ADMIN, "/majburiy_guruh")
+    assert str(G) in bot.texts_to(ADMIN)[-1]
+    await send(bot, dp, ADMIN, f"/majburiy_guruh {G}")
+    assert "Saqlandi" in bot.texts_to(ADMIN)[-1]
+
+    # R — guruh a'zosi: taklif havolalari
+    await send(bot, dp, R, "/start")
+    await send(bot, dp, R, "👥 Do'stlarni taklif qilish")
+    inv = bot.texts_to(R)[-1]
+    assert f"https://t.me/testbot?start=r{R}" in inv and "https://t.me/+ref" in inv
+    personal = inv.split("Guruhga havola:\n")[1].split("\n")[0]
+
+    # N — yangi odam, R havolasi bilan; guruhda emas -> to'siq
+    await send(bot, dp, N, f"/start r{R}")
+    assert "guruhimizga qo'shiling" in bot.texts_to(N)[-1]
+    await send(bot, dp, N, "🧍 Yo'lovchiman")
+    assert "guruhimizga qo'shiling" in bot.texts_to(N)[-1]  # botdan foydalana olmaydi
+    await click(bot, dp, N, f"gate:r{R}")                  # hali qo'shilmagan
+    assert await db.bonus_balance(R) == 0
+    # N guruhga qo'shildi va «Qo'shildim» bosdi -> R ga 5 ball
+    bot.members[G].add(N)
+    await click(bot, dp, N, f"gate:r{R}")
+    assert "Kimsiz?" in bot.texts_to(N)[-1]
+    assert await db.bonus_balance(R) == 5
+    assert any("+5 ball" in t for t in bot.texts_to(R))
+    await send(bot, dp, N, "🧍 Yo'lovchiman")              # endi ishlaydi
+    assert "Qayerga borasiz" in bot.texts_to(N)[-1]
+    await send(bot, dp, N, "❌ Bekor qilish")
+    await send(bot, dp, N, f"/start r{R}")                 # qayta — ikkinchi marta ball yo'q
+    assert await db.bonus_balance(R) == 5
+
+    # E — eski foydalanuvchi: havola bilan kirsa ham ball berilmaydi
+    await send(bot, dp, E, f"/start r{R}")
+    assert await db.bonus_balance(R) == 5
+
+    # M — avval R ning shaxsiy GURUH havolasi bilan guruhga kirdi, keyin botga
+    bot.members[G].add(M)
+    await member_event(bot, dp, G, M, joined=True, link=personal)
+    await send(bot, dp, M, "/start")
+    assert await db.bonus_balance(R) == 10
+    invited, awarded = await db.referral_stats(R)
+    assert (invited, awarded) == (2, 2)
+
+    # N guruhdan chiqdi -> botdan foydalana olmaydi
+    bot.members[G].discard(N)
+    await member_event(bot, dp, G, N, joined=False)
+    await send(bot, dp, N, "💰 Bonusim")
+    assert "guruhimizga qo'shiling" in bot.texts_to(N)[-1]
+
+    # Admin guruhda bo'lmasa ham to'siqsiz
+    await send(bot, dp, ADMIN, "💰 Bonusim")
+    assert "Bonus ballaringiz" in bot.texts_to(ADMIN)[-1]
+    await send(bot, dp, ADMIN, "/taklif_ball 7")
+    assert await db.get_setting("ref_points", "") == "7"
+    # Majburiy guruhni o'chirish
+    await send(bot, dp, ADMIN, "/majburiy_guruh off")
+    await send(bot, dp, N, "💰 Bonusim")
+    assert "Bonus ballaringiz" in bot.texts_to(N)[-1]

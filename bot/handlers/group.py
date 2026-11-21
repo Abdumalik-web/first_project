@@ -13,6 +13,7 @@ from aiogram import Bot, F, Router
 from aiogram.exceptions import TelegramAPIError
 from aiogram.types import ChatMemberUpdated, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
+from .. import referral
 from ..db import Database
 from ..group_parser import Lead, normalize, parse
 from ..matching import rank_trips_for_lead
@@ -70,6 +71,31 @@ def lead_text(lead: Lead, message: Message, trip_date: str | None, distance_km: 
     lines += contacts or ["Kontakt yozilmagan — xabarni guruhda oching."]
     lines += ["", "Yo'lovchiga o'zingiz bog'laning."]
     return "\n".join(lines)
+
+
+@router.chat_member()
+async def member_changed(event: ChatMemberUpdated, db: Database, bot: Bot) -> None:
+    """Majburiy guruhga kim qo'shildi / chiqdi: a'zolik va taklif ballari."""
+    req = await referral.required_group(db)
+    member = event.new_chat_member
+    if req is None or event.chat.id != req or member.user.is_bot:
+        return
+    uid = member.user.id
+    joined = member.status in referral.MEMBER_STATUSES or (
+        member.status == "restricted" and bool(getattr(member, "is_member", False)))
+    user = await db.get_user(uid)
+    if not joined:
+        if user:
+            await db.set_group_ok(uid, False)
+        return
+    if user:
+        await db.set_group_ok(uid, True)
+        await referral.maybe_award(bot, db, uid)
+    elif event.invite_link:
+        # Guruhga kimningdir shaxsiy havolasi bilan kirdi, botda hali yo'q — keyin hisoblaymiz
+        ref = await db.referrer_by_link(event.invite_link.invite_link)
+        if ref and ref != uid:
+            await db.add_pending_ref(uid, ref)
 
 
 @router.my_chat_member()

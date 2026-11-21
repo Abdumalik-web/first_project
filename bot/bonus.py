@@ -68,7 +68,8 @@ async def explain_text(db: Database, uid: int) -> str:
     history = await db.bonus_history(uid, 8)
     if history:
         lines.append("\n<b>Oxirgi harakatlar:</b>")
-        names = {"referral": "yo'lovchi uzatildi", "revoke": "bekor qilindi",
+        names = {"referral": "yo'lovchi uzatildi", "invite": "do'st taklif qilindi",
+                 "revoke": "bekor qilindi",
                  "payout": "to'lab berildi", "manual": "admin"}
         for h in history:
             sign = "+" if h["points"] > 0 else ""
