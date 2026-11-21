@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<style>
+  :root { --y:#FFC400; --blue:#2AABEE; --navy:#0B1530; --green:#22c55e; --red:#ef4444; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html,body { width:1080px; height:1920px; overflow:hidden; background:#0B1530; font-family:Inter, "DejaVu Sans", sans-serif; color:#fff; }
+  #gl { position:absolute; inset:0; width:1080px; height:1920px; }
+  .ov { position:absolute; }
+  #brand { top:64px; left:0; right:0; text-align:center; font-weight:900; font-size:44px; letter-spacing:1px; text-shadow:0 4px 18px rgba(0,0,0,.6); }
+  #brand small { display:block; font-weight:700; font-size:28px; letter-spacing:3px; opacity:.85; margin-top:4px; }
+  #headline { top:210px; left:40px; right:40px; text-align:center; font-weight:900; font-size:92px; line-height:1.02; letter-spacing:-1px;
+    text-shadow:0 6px 0 rgba(0,0,0,.35), 0 18px 40px rgba(0,0,0,.55); transform-origin:50% 60%; }
+  #headline .y { color:var(--y); } #headline .b { color:var(--blue); } #headline .g { color:var(--green); } #headline .r { color:var(--red); }
+  #headline .sm { display:block; font-size:54px; font-weight:800; margin-top:10px; letter-spacing:0; }
+  #chips { top:1270px; left:0; right:0; display:flex; flex-direction:column; align-items:center; gap:18px; }
+  .chip { display:flex; align-items:center; gap:16px; padding:16px 30px 16px 18px; border-radius:999px; background:rgba(8,14,34,.78);
+    border:3px solid rgba(255,255,255,.18); font-weight:800; font-size:44px; box-shadow:0 14px 40px rgba(0,0,0,.45); }
+  .chip i { width:56px; height:56px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-style:normal; font-weight:900; font-size:36px; }
+  .ok i { background:var(--green); } .no i { background:var(--red); } .coin i { background:var(--y); color:#0B1530; }
+  #counter { top:1060px; left:0; right:0; text-align:center; }
+  #counter .v { font-weight:900; font-size:150px; color:var(--y); letter-spacing:-3px; text-shadow:0 8px 0 #b37a00, 0 24px 50px rgba(0,0,0,.6); }
+  #counter .l { font-weight:800; font-size:52px; margin-top:4px; text-shadow:0 4px 18px rgba(0,0,0,.7); }
+  #subs { left:50px; right:50px; top:1470px; text-align:center; font-weight:800; font-size:52px; line-height:1.28; }
+  #subs .box { background:rgba(0,0,0,.66); padding:12px 24px; border-radius:20px; -webkit-box-decoration-break:clone; box-decoration-break:clone; }
+  #subs .w { opacity:.55; } #subs .w.on { opacity:1; color:var(--y); }
+  .lbl { font-weight:900; font-size:40px; padding:8px 20px; border-radius:14px; background:rgba(8,14,34,.82); border:3px solid var(--y); transform:translate(-50%,-100%); white-space:nowrap; }
+  #cta { left:0; right:0; top:560px; perspective:1400px; }
+  .card { margin:0 60px 30px; background:#fff; color:#0B1530; border-radius:34px; padding:26px 30px; display:flex; align-items:center; gap:24px;
+    box-shadow:0 30px 70px rgba(0,0,0,.5); transform-style:preserve-3d; }
+  .card .ic { width:96px; height:96px; border-radius:50%; flex:none; display:flex; align-items:center; justify-content:center; }
+  .card .t1 { font-size:30px; font-weight:700; color:#5b6680; } .card .t2 { font-size:41px; font-weight:900; word-break:break-all; }
+  #startbtn { margin:40px auto 0; width:max-content; padding:30px 70px; border-radius:999px; background:var(--y); color:#0B1530; font-weight:900; font-size:64px;
+    box-shadow:0 14px 0 #b37a00, 0 30px 60px rgba(0,0,0,.5); }
+  #flash { inset:0; background:#fff; opacity:0; }
+  #vign { inset:0; background:radial-gradient(ellipse at 50% 45%, rgba(0,0,0,0) 55%, rgba(0,0,0,.55) 100%); }
+</style>
+<script type="importmap">{ "imports": { "three": "./node_modules/three/build/three.module.js" } }</script>
+</head>
+<body>
+<canvas id="gl" width="1080" height="1920"></canvas>
+<div class="ov" id="vign"></div>
+<div id="labels"></div>
+<div class="ov" id="brand"><span style="color:var(--y)">YOʻLDAMIZ</span> TAKSI<small>FARGʻONA ⇄ TOSHKENT</small></div>
+<div class="ov" id="headline"></div>
+<div class="ov" id="chips"></div>
+<div class="ov" id="counter" style="opacity:0"><div class="v"></div><div class="l"></div></div>
+<div class="ov" id="cta" style="opacity:0">
+  <div class="card" id="cardBot"><div class="ic" style="background:var(--y)"><svg width="58" height="58" viewBox="0 0 24 24"><rect x="4" y="7" width="16" height="12" rx="3" fill="#0B1530"/><circle cx="9" cy="13" r="1.8" fill="#FFC400"/><circle cx="15" cy="13" r="1.8" fill="#FFC400"/><rect x="11" y="3" width="2" height="4" fill="#0B1530"/><circle cx="12" cy="3" r="1.6" fill="#0B1530"/></svg></div>
+    <div><div class="t1">Bot</div><div class="t2">@yoldamiz_fargona_toshkent_bot</div></div></div>
+  <div class="card" id="cardGrp"><div class="ic" style="background:var(--blue)"><svg width="58" height="58" viewBox="0 0 24 24"><path d="M3 11.5 20.5 4.5 17.5 19.5 11.5 15 9.5 19 9 14 17 7.5 7.5 13z" fill="#fff"/></svg></div>
+    <div><div class="t1">Guruhimiz</div><div class="t2">t.me/toshken_fargonaa_taksi</div></div></div>
+  <div id="startbtn">/start  ▶</div>
+</div>
+<div class="ov" id="subs"></div>
+<div class="ov" id="flash"></div>
+<script type="module" src="./main.js"></script>
+</body>
+</html>
