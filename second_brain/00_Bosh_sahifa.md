@@ -9,7 +9,7 @@ tags: [moc]
 ## 📈 So'nggi tahlillar
 ```dataview
 TABLE symbol AS "Juftlik", sessiya AS "Sessiya", tavsiya AS "Tavsiya", eng_yuqori_model AS "Eng yuqori model",
-      yonalish AS "Yo'nalish", ball AS "Ball", rr AS "R:R", natija AS "Natija"
+      yonalish AS "Yo'nalish", ball AS "Ball", rr AS "R:R", manba AS "Manba", natija AS "Natija"
 FROM "05_tahlillar"
 WHERE turi = "tahlil"
 SORT file.name DESC

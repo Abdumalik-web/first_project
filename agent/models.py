@@ -150,7 +150,7 @@ def _sweep_check(ctx, direction) -> tuple[Check, dict | None]:
     side = "SSL" if direction == "bullish" else "BSL"
     sw = [s for s in ctx["sweeps"] if s["side"] == side]
     if sw:
-        return Check("Likvidlik sweep", True, f"{sw[-1]['level']} ({sw[-1]['price']}) sweep qilindi, {sw[-1]['ts']}"), sw[-1]
+        return Check("Likvidlik sweep", True, f"{sw[-1]['level']} ({sw[-1]['price']:.5f}) sweep qilindi, {sw[-1]['ts']}"), sw[-1]
     return Check("Likvidlik sweep", False, f"bugun {side} sweep aniqlanmadi"), None
 
 
@@ -240,7 +240,7 @@ def ict(ctx) -> ModelResult:
     r.checks.append(_smt_check(ctx, direction))
     ev = _recent_event(ctx, "5m", direction, 48, need_disp=True)
     r.checks.append(Check("MSS displacement bilan (5m)", ev is not None,
-                          f"{ev.kind} {ev.level} da, {ev.ts}" if ev else "so'nggi 4 soatda displacement'li MSS yo'q"))
+                          f"{ev.kind} {ev.level:.5f} da, {ev.ts}" if ev else "so'nggi 4 soatda displacement'li MSS yo'q"))
     fvg = _fresh_fvg(ctx, "5m", direction, 48, after_i=(ev.i - 3) if ev else None)
     r.checks.append(Check("Kirish uchun FVG", fvg is not None,
                           f"FVG {fvg.bottom:.5f}–{fvg.top:.5f} ({fvg.ts})" if fvg else "yangi FVG yo'q"))
@@ -292,7 +292,7 @@ def smc(ctx) -> ModelResult:
     r.checks.append(_sweep_check(ctx, direction)[0])
     ev = _recent_event(ctx, "5m", direction, 48, kinds=("CHoCH",))
     r.checks.append(Check("LTF CHoCH (tana bilan yopilgan)", ev is not None,
-                          f"CHoCH {ev.level} da, {ev.ts}" if ev else "so'nggi 4 soatda LTF CHoCH yo'q"))
+                          f"CHoCH {ev.level:.5f} da, {ev.ts}" if ev else "so'nggi 4 soatda LTF CHoCH yo'q"))
     fvg = _fresh_fvg(ctx, "15m", direction, 32) or _fresh_fvg(ctx, "5m", direction, 48)
     r.checks.append(Check("Imbalance (FVG) mavjud", fvg is not None,
                           f"FVG {fvg.bottom:.5f}–{fvg.top:.5f}" if fvg else "yo'q"))
