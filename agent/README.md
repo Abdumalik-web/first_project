@@ -37,6 +37,18 @@ U har bir savdo modelini grafikka qo'yib ko'radi va eng mosini tavsiya qiladi.
 
 ## Ishlatish
 
+### Eng oson yo'l: `Tahlil.bat`
+`first_project-main` papkasidagi **`Tahlil.bat`** faylini ikki marta bosing. Menyu ochiladi:
+1. Tezkor skaner (bepul).
+2. To'liq tahlil. Chart rasmini oynaga sudrab tashlash mumkin.
+3. Haftalik hisobot.
+
+Natija avtomatik ravishda **Obsidian'da ochiladi**, qora oynadan o'qish shart emas.
+Qulaylik uchun faylni o'ng tugma bilan bosib, **Show more options → Send to → Desktop (create shortcut)** ni tanlang.
+Shunda ish stolida yorliq paydo bo'ladi.
+
+### Buyruq qatori orqali
+
 Loyiha papkasida (`first_project/`) ishga tushiring:
 
 To'liq tahlil (texnik + fundamental + model tavsiyasi):

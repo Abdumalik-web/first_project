@@ -25,6 +25,7 @@ TASHKENT = ZoneInfo("Asia/Tashkent")
 
 
 def scan(symbol: str, source: str = "auto", now: datetime | None = None) -> dict:
+    print(f"⏳ {symbol.upper()} narxlari yuklanmoqda (10–30 soniya)...", flush=True)
     frames = load_all(symbol, source)
     missing = [tf for tf in ("1d", "4h", "1h", "15m") if tf not in frames]
     if missing:
@@ -33,7 +34,9 @@ def scan(symbol: str, source: str = "auto", now: datetime | None = None) -> dict
     corr = None
     pair = SMT_PAIRS.get(symbol.upper())
     if pair:
+        print(f"⏳ SMT uchun {pair[0]} yuklanmoqda...", flush=True)
         corr = load_all(pair[0], source)
+    print("🔎 Modellar grafikka qo'yib ko'rilmoqda...", flush=True)
     now = now or datetime.now(ZoneInfo(NY_TZ))
     ctx = models.build_context(symbol, frames, corr, now)
     last_bar = frames["5m"].index[-1] if "5m" in frames else frames["15m"].index[-1]
@@ -102,7 +105,8 @@ def summary_main(argv: list[str]) -> None:
     links = "\n\n---\n## Manba tahlillar\n" + "\n".join(f"- [[{f.stem}]]" for f in reports) + "\n\n[[00_Bosh_sahifa]]\n"
     out = SUMMARY_DIR / f"{name}.md"
     out.write_text(vault.frontmatter(meta) + text + links, encoding="utf-8")
-    print(f"\nHisobot saqlandi: {out}")
+    print(f"\n✅ Hisobot saqlandi: {out}")
+    vault.open_in_obsidian(out, SUMMARY_DIR.parent)
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -115,7 +119,13 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--savol", help="qo'shimcha savol")
     ap.add_argument("--manba", choices=["auto", "yahoo", "csv"], default="auto")
     ap.add_argument("--offline", action="store_true", help="Claude'ni chaqirmasdan faqat skaner natijasi")
+    ap.add_argument("--ochma", action="store_true", help="natijani Obsidian'da avtomatik ochmaslik")
     args = ap.parse_args(argv)
+
+    if args.rasm:
+        args.rasm = Path(str(args.rasm).strip().strip('"'))
+        if not args.rasm.exists():
+            sys.exit(f"Rasm topilmadi: {args.rasm}")
 
     res = scan(args.symbol, args.manba)
     print_scorecard(res)
@@ -123,20 +133,25 @@ def main(argv: list[str] | None = None) -> None:
     SCAN_JSON_DIR.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now(TASHKENT).strftime("%Y-%m-%d_%H%M")
     name = f"{stamp}_{res['symbol']}"
-    json_path = SCAN_JSON_DIR / f"{name}.json"
-    json_path.write_text(json.dumps(res, ensure_ascii=False, indent=1), encoding="utf-8")
+    (SCAN_JSON_DIR / f"{name}.json").write_text(json.dumps(res, ensure_ascii=False, indent=1), encoding="utf-8")
+
+    meta = vault.report_meta(res)
+    scan_md = vault.scan_markdown(res)
     if args.offline:
-        print(f"Skaner natijasi saqlandi: {json_path}")
-        return
+        meta["manba"] = "skaner"
+        body = scan_md
+    else:
+        from .analyst import analyze
 
-    from .analyst import analyze
-
-    if args.rasm and not args.rasm.exists():
-        sys.exit(f"Rasm topilmadi: {args.rasm}")
-    report = analyze(res["symbol"], res, args.rasm, args.savol)
+        print("\n🤖 Claude fundamental tahlil va hisobot yozmoqda (1–3 daqiqa)...\n", flush=True)
+        report = analyze(res["symbol"], res, args.rasm, args.savol)
+        meta["manba"] = "claude"
+        body = report + "\n\n---\n## Ilova: skaner natijasi\n" + scan_md.split("\n", 1)[1]
     md_path = REPORTS_DIR / f"{name}.md"
-    md_path.write_text(vault.frontmatter(vault.report_meta(res)) + report + vault.skills_footer(res), encoding="utf-8")
-    print(f"\nHisobot saqlandi (Obsidian'da oching): {md_path}")
+    md_path.write_text(vault.frontmatter(meta) + body + vault.skills_footer(res), encoding="utf-8")
+    print(f"\n✅ Saqlandi: {md_path}")
+    if not args.ochma:
+        vault.open_in_obsidian(md_path, REPORTS_DIR.parent)
 
 
 if __name__ == "__main__":
