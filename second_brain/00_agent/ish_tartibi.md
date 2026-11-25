@@ -16,6 +16,11 @@ Agent har bir tahlil so'rovida shu qadamlarni bajaradi.
 ## 3. Texnik tahlil (`01_skills/texnik/`)
 Tartib: trend → darajalar → indikatorlar → patternlar → hajm.
 
+**Forex uchun asosiy usul: ICT (`01_skills/ict/`).**
+`06_kirish_modeli_checklist.md` dagi 10 qadamni ketma-ket bajar va checklistni to'ldir.
+SMT uchun korrelyatsion juftlik (masalan GBPUSD yoki DXY) ma'lumotini ham yukla.
+Vaqtlarni ham NY, ham Toshkent vaqtida ko'rsat.
+
 ## 4. Fundamental tahlil (`01_skills/fundamental/`)
 - Aksiya bo'lsa: hisobotlar → nisbatlar → baholash.
 - Kripto bo'lsa: tokenomika → on-chain → ekotizim.

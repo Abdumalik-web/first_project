@@ -10,6 +10,7 @@ qilish) va qoidalardan (qanday qaror qilish) foydalanadi.
 |---|---|
 | `00_agent/` | Agentning "shaxsiyati": rolli, ish tartibi, system prompt |
 | `01_skills/texnik/` | Texnik tahlil skillari: trend, indikatorlar, patternlar, darajalar |
+| `01_skills/ict/` | Forex uchun ICT va SMT skillari: struktura, likvidlik, FVG/OB, killzone'lar, SMT, kirish modeli |
 | `01_skills/fundamental/` | Fundamental tahlil skillari: moliyaviy hisobotlar, baholash, kripto tokenomika |
 | `02_malumotlar/` | Xom ma'lumotlar: aktiv profillari, narxlar (CSV), moliyaviy hisobotlar |
 | `03_qoidalar/` | Risk menejment va savdo qoidalari. Agent ulardan chetga chiqmaydi |
