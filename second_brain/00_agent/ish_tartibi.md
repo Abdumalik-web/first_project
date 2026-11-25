@@ -21,6 +21,12 @@ Tartib: trend → darajalar → indikatorlar → patternlar → hajm.
 SMT uchun korrelyatsion juftlik (masalan GBPUSD yoki DXY) ma'lumotini ham yukla.
 Vaqtlarni ham NY, ham Toshkent vaqtida ko'rsat.
 
+**SMC (`01_skills/smc/`)** ICT bilan birga ishlatiladi:
+- struktura (ichki va tashqi, CHoCH), IDM va POI tanlash SMC bo'yicha;
+- vaqt (killzone) va SMT ICT bo'yicha.
+
+Ikkala checklistni ham to'ldir. Agar ular bir-biriga zid bo'lsa, ishonch darajasini pasaytir.
+
 ## 4. Fundamental tahlil (`01_skills/fundamental/`)
 - Aksiya bo'lsa: hisobotlar → nisbatlar → baholash.
 - Kripto bo'lsa: tokenomika → on-chain → ekotizim.
