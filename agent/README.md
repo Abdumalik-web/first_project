@@ -1,6 +1,6 @@
 # 🤖 Forex tahlil agenti
 
-Agent `second_brain/` dagi skillar asosida forex juftligini **real vaqtga yaqin** ma'lumot bilan tahlil qiladi.
+Agent `second_brain/` (Obsidian vault) dagi skillar asosida forex juftligini **real vaqtga yaqin** ma'lumot bilan tahlil qiladi.
 U har bir savdo modelini grafikka qo'yib ko'radi va eng mosini tavsiya qiladi.
 
 ## Qanday ishlaydi
@@ -61,6 +61,46 @@ python -m agent EURUSD --manba csv
 
 Qo'llab-quvvatlanadigan juftliklar: EURUSD, GBPUSD, AUDUSD, NZDUSD, USDJPY, USDCHF, USDCAD,
 EURJPY, GBPJPY, EURGBP, XAUUSD, XAGUSD. Yangi juftlik qo'shish uchun uni `agent/config.py` ga yozing.
+
+## Obsidian bilan ishlash
+
+`second_brain/` papkasi Obsidian vault sifatida ishlaydi.
+
+1. Obsidian'ni o'rnating: https://obsidian.md
+2. **Open folder as vault** tugmasini bosing va `first_project/second_brain` papkasini tanlang.
+3. Community plugins bo'limida **Dataview** plaginini o'rnatib, yoqing.
+4. **[[00_Bosh_sahifa]]** ni oching. U yerda so'nggi tahlillar, modellar statistikasi va hisobotlar jadvali bor.
+
+Agent va Obsidian quyidagicha birga ishlaydi:
+
+| Siz Obsidian'da | Agent |
+|---|---|
+| `07_qaydlar/` ga o'z qoidalaringiz va kuzatuvlaringizni yozasiz | har bir tahlilda ularni o'qiydi |
+| `01_skills/` dagi skillarni tahrirlaysiz yoki yangisini qo'shasiz | keyingi tahlilda yangilangan bilim bilan ishlaydi |
+| — | `05_tahlillar/` ga metadata va `[[havola]]`lar bilan hisobot yozadi |
+| tahlil faylidagi `natija:` maydoniga `win`, `loss`, `be` yoki `olinmadi` deb yozasiz | statistika va hisobotda hisobga oladi |
+| `06_jurnal/savdo_jurnali.md` ni to'ldirasiz | xatolardan o'rganadi, hisobotda natijalarni tahlil qiladi |
+| — | shu juftlik bo'yicha o'tgan 3 ta tahlilni o'qib, ular bilan solishtiradi |
+
+### Vault'dan hisobot olish
+
+Haftalik hisobot:
+```bash
+python -m agent hisobot
+```
+
+30 kunlik, faqat bitta juftlik bo'yicha:
+```bash
+python -m agent hisobot --kun 30 --juftlik EURUSD
+```
+
+Vault bo'yicha erkin savol:
+```bash
+python -m agent hisobot --kun 30 --savol "Qaysi model eng ko'p ishladi va qaysi sessiyada?"
+```
+
+Hisobot `08_hisobotlar/` papkasiga saqlanadi va manba tahlillarga `[[havola]]` qiladi.
+Ularni Obsidian grafigida (Graph view) ko'rish mumkin.
 
 ## Natija misoli (`--offline`)
 

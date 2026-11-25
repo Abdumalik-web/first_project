@@ -4,6 +4,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 BRAIN = ROOT / "second_brain"
 REPORTS_DIR = BRAIN / "05_tahlillar"
+SCAN_JSON_DIR = REPORTS_DIR / "_json"
+JOURNAL_DIR = BRAIN / "06_jurnal"
+NOTES_DIR = BRAIN / "07_qaydlar"
+SUMMARY_DIR = BRAIN / "08_hisobotlar"
 PRICES_DIR = BRAIN / "02_malumotlar" / "narxlar"
 
 MODEL = "claude-opus-5-5"

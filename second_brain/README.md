@@ -1,5 +1,7 @@
 # 🧠 2-chi miya (Second Brain)
 
+> Bu papkani **Obsidian**'da vault sifatida oching va [[00_Bosh_sahifa]] dan boshlang.
+
 Bu papka AI agentning **bilim bazasi**. Agent tahlil qilishdan oldin shu yerdagi
 fayllarni o'qiydi. U skillar (qanday tahlil qilish), ma'lumotlar (nimani tahlil
 qilish) va qoidalardan (qanday qaror qilish) foydalanadi.
@@ -19,6 +21,8 @@ qilish) va qoidalardan (qanday qaror qilish) foydalanadi.
 | `04_shablonlar/` | Tahlil hisobotlari uchun shablonlar |
 | `05_tahlillar/` | Agent yozgan tayyor tahlillar (tarix) |
 | `06_jurnal/` | Savdo jurnali va xulosalar. Agent o'z xatolaridan o'rganadi |
+| `07_qaydlar/` | Shaxsiy qaydlaringiz. Agent ularni har tahlilda o'qiydi |
+| `08_hisobotlar/` | Agent yozgan haftalik va oylik hisobotlar |
 
 ## Qanday ishlaydi
 
