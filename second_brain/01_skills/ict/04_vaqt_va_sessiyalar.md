@@ -21,6 +21,7 @@ Toshkent vaqti UTC+5, yozgi vaqtga o'tmaydi. New York vaqti qishda EST (UTC−5)
 
 ## Silver Bullet oynalari
 Har biri 1 soatlik oyna. Bu vaqtda likvidlik sweep'idan keyin hosil bo'lgan FVG orqali kirish izlanadi.
+To'liq model: `07_silver_bullet.md`.
 | Oyna | NY | Toshkent (qish) | Toshkent (yoz) |
 |---|---|---|---|
 | London SB | 03:00 – 04:00 | 13:00 – 14:00 | 12:00 – 13:00 |

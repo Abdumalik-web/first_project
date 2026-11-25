@@ -10,7 +10,7 @@ qilish) va qoidalardan (qanday qaror qilish) foydalanadi.
 |---|---|
 | `00_agent/` | Agentning "shaxsiyati": rolli, ish tartibi, system prompt |
 | `01_skills/texnik/` | Texnik tahlil skillari: trend, indikatorlar, patternlar, darajalar |
-| `01_skills/ict/` | Forex uchun ICT va SMT skillari: struktura, likvidlik, FVG/OB, killzone'lar, SMT, kirish modeli |
+| `01_skills/ict/` | Forex uchun ICT va SMT skillari: struktura, likvidlik, FVG/OB, killzone'lar, SMT, kirish modeli, Silver Bullet |
 | `01_skills/smc/` | Smart Money Concepts: ichki va tashqi struktura, CHoCH, inducement, POI/OB yaroqliligi, kirish turlari |
 | `01_skills/crt/` | Candle Range Theory: 3 shamli model, CRT High/Low/50%, HTF va LTF juftliklari, kirish modeli |
 | `01_skills/fundamental/` | Fundamental tahlil skillari: moliyaviy hisobotlar, baholash, kripto tokenomika |

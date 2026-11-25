@@ -29,6 +29,9 @@ Vaqtlarni ham NY, ham Toshkent vaqtida ko'rsat.
 - kechagi kun yoki oxirgi 4H shamni diapazon sifatida ol;
 - unda sweep va ichkariga qaytish bormi, tekshir.
 
+**Silver Bullet (`01_skills/ict/07_silver_bullet.md`)**: agar so'rov SB oynasiga yaqin vaqtda kelgan bo'lsa,
+SB modeli bo'yicha alohida kun ichidagi setup tayyorla.
+
 ICT, SMC va CRT checklistlarining hammasini to'ldir. Agar ular bir-biriga zid bo'lsa, ishonch darajasini pasaytir.
 
 ## 4. Fundamental tahlil (`01_skills/fundamental/`)
