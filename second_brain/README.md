@@ -35,6 +35,14 @@ Savol ("BTC ni tahlil qil")
 7. 05_tahlillar/             → natijani saqlaydi
 ```
 
+## Agentni ishga tushirish
+
+Agent kodi `agent/` papkasida. Qo'llanma: `agent/README.md`.
+
+```bash
+python -m agent EURUSD --rasm chart.png
+```
+
 ## Bilim qo'shish
 
 - **Yangi skill:** `01_skills/` ichiga `.md` fayl qo'shing. Uni `_skill_shabloni.md` asosida yozing.
