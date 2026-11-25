@@ -25,7 +25,11 @@ Vaqtlarni ham NY, ham Toshkent vaqtida ko'rsat.
 - struktura (ichki va tashqi, CHoCH), IDM va POI tanlash SMC bo'yicha;
 - vaqt (killzone) va SMT ICT bo'yicha.
 
-Ikkala checklistni ham to'ldir. Agar ular bir-biriga zid bo'lsa, ishonch darajasini pasaytir.
+**CRT (`01_skills/crt/`)** HTF bias va maqsadlarni aniqlash uchun ishlatiladi:
+- kechagi kun yoki oxirgi 4H shamni diapazon sifatida ol;
+- unda sweep va ichkariga qaytish bormi, tekshir.
+
+ICT, SMC va CRT checklistlarining hammasini to'ldir. Agar ular bir-biriga zid bo'lsa, ishonch darajasini pasaytir.
 
 ## 4. Fundamental tahlil (`01_skills/fundamental/`)
 - Aksiya bo'lsa: hisobotlar → nisbatlar → baholash.
