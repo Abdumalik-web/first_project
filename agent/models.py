@@ -150,7 +150,7 @@ def _sweep_check(ctx, direction) -> tuple[Check, dict | None]:
     side = "SSL" if direction == "bullish" else "BSL"
     sw = [s for s in ctx["sweeps"] if s["side"] == side]
     if sw:
-        return Check("Likvidlik sweep", True, f"{sw[-1]['level']} ({sw[-1]["price"]:.5f}) sweep qilindi, {sw[-1]['ts']}"), sw[-1]
+        return Check("Likvidlik sweep", True, f"{sw[-1]['level']} ({sw[-1]['price']:.5f}) sweep qilindi, {sw[-1]['ts']}"), sw[-1]
     return Check("Likvidlik sweep", False, f"bugun {side} sweep aniqlanmadi"), None
 
 
