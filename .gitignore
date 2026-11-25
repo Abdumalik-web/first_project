@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+.env
+second_brain/05_tahlillar/_json/
+second_brain/.obsidian/workspace*.json
